@@ -1,0 +1,65 @@
+<!--
+To change this template, choose Tools | Templates
+and open the template in the editor.
+-->
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <script type="text/javascript">
+            init=function(){
+                var div1=document.getElementById('1');
+                var div2=document.getElementById('2');
+                var div3=document.getElementById('3');
+                div1.addEventListener('click', function(){alert(1);}, false);
+                div2.addEventListener('click', function(){alert(2);}, false);
+                div3.addEventListener('click', function(){this.focus();}, false);
+                div3.addEventListener('keyup', function(){alert('3 keyup');}, false);
+                var te=document.getElementById('textEditor');
+                te.contentEditable=true;
+                te.addEventListener('paste', paste, false);
+                statusField.addEventListener('DOMSubtreeModified',logStatus,false);
+                sf2.addEventListener('DOMSubtreeModified',ls,false);
+                statusField.count=0;
+                sf2.count=0;
+            }
+            var logStatus=function(){
+                statusField.removeEventListener('DOMSubtreeModified',logStatus,false);
+                statusField.innerHTML="dom Modified"+statusField.count++;
+                statusField.addEventListener('DOMSubtreeModified',logStatus,false);
+            }
+            var ls=function(){
+                sf2.innerHTML="domModified"+sf2.count++;
+            }
+            paste=function(){
+                alert('pasting data');
+            }
+            onload=init;
+            window.parent=null;
+            window.top=null;
+            if(window.parent!=null){
+                alert('success')
+            }else{
+                alert('found')
+            }
+        </script>
+    </head>
+    <body>
+        <div id="1" style="position: relative; width:100px;height:100px; background-color: red">
+            <div id="2" style="position: relative;width:60px;height:60px; background-color: green">
+                <div id="3" style="position: relative;width:30px;height:30px; background-color: blue" tabindex="0">
+                    hi
+                </div>
+            </div>
+        </div>
+        <div id="textEditor" style="position: relative; width: 1000px; height: 400px; border: 1px solid black" contenteditable="true">
+
+        </div>
+        <div id="f1" style="width:100px;height:100px;background-color: red;vertical-align: middle" tabindex="0" onfocus="alert('f1')">
+            <div id="f2" style="width: 50px;height:50px;background-color: green;vertical-align: middle" tabindex="0"></div>
+        </div>
+        <div id="statusField">status</div>
+        <div id="sf2">s2</div>
+    </body>
+</html>

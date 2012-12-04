@@ -1,0 +1,279 @@
+/* 
+    Document   : coreStyleSheet
+    Created on : Nov 22, 2011, 5:47:18 PM
+    Author     : gowtham
+    Description:
+        Purpose of the stylesheet follows.
+*/
+
+/* 
+   TODO customize this sample style
+   Syntax recommendation http://www.w3.org/TR/REC-CSS2/
+*/
+
+root { 
+    display: block;
+}
+body {
+    font-family: "lucida grande",tahoma,verdana,arial,sans-serif;
+    font-size: 14px;
+    cursor: default
+}
+
+.holder:hover{
+    cursor: move;
+}
+.logMsg{
+    background-color: #DDF;
+    margin: 1px;
+    border: 1px solid #EEF;
+    padding: 0px 1px 0px 1px;
+    color: black;
+}
+.msgPanel {
+    display: block;
+    position: fixed;
+    z-index: 6;
+    background-color: rgba(170,170,255,0.9);
+    padding: 1px;
+    border: 1px solid #88F;
+    box-shadow: 
+        1px 1px 0 rgba(0, 0, 0, 0.45) inset,
+        -1px -1px 0 rgba(0, 0, 0, 0.45) inset,
+        0 2px 5px rgba(0,0,0,0.25);
+    float: left;
+    opacity:0.9
+}
+.panelBody{
+    overflow: auto;
+}
+#header{
+    position: fixed;
+    visibility: visible;
+    z-index: 6;
+    color: white;
+    height: 60px;
+    width:100%;
+    background-color: rgba(0,0,0,0.72);
+}
+.panelBody::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+.panelBody::-webkit-scrollbar-button {
+    display: none;
+}
+.panelBody::-webkit-scrollbar-corner {
+    background: transparent;
+}
+.panelBody::-webkit-scrollbar-thumb {
+    border-radius: 17px;
+    background: #111;
+    border: 2px solid transparent;
+}
+.panelBody::-webkit-scrollbar-track-piece {
+    background-color: transparent;
+}
+.subWindow::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+.subWindow::-webkit-scrollbar-button {
+    display: none;
+}
+.subWindow::-webkit-scrollbar-corner {
+    background: transparent;
+}
+.subWindow::-webkit-scrollbar-thumb {
+    border-radius: 17px;
+    background: #111;
+}
+.subWindow::-webkit-scrollbar-track-piece {
+    background-color: transparent;
+}
+#body{
+    position:relative;
+    left: 0px;
+    top: 0px;
+    overflow: auto;
+}
+#body::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+#body::-webkit-scrollbar-button {
+    display: none;
+}
+#body::-webkit-scrollbar-corner {
+    background: white;
+}
+#body::-webkit-scrollbar-thumb {
+    background: grey;
+    border: 0px solid white;
+    border-top-width: 2px;
+    border-left-width: 2px;
+}
+#body::-webkit-scrollbar-track-piece {
+    background-color: white;
+    border: 0px solid white;
+    border-left-width: 2px;
+    border-top-width: 2px;
+}
+#body::-webkit-scrollbar-track-piece:hover {
+    background-color: #ddd;
+}
+#bodySpace{
+    position: relative;
+    top: 0px;
+    left: 0px;
+}
+#logo{
+    float: left;
+    margin-right: 8px;
+}
+#topHLine{
+    line-height:30px; 
+}
+#signInTool{
+    display: inline
+}
+#username{
+    width: 123px;
+    height: 14px;
+}
+#password{
+    width: 123px;
+    height: 14px;
+}
+#register_Btn{
+}
+#bottomHLine{
+    line-height: 30px
+}
+#homeBtn{
+    float: left;
+    position: relative;
+    margin-top: 6px;
+    margin-right: 6px;
+}
+#statusBar{
+    color: #55f;
+    font-size: 16px;
+}
+#footer{
+    position: fixed;
+    bottom: 8px;
+    right: 8px;
+    z-index: 8;
+}
+#welcomeUser{
+    color: white;
+}
+#userProfileBtn{
+}
+#signOutTool{
+}
+#searchTool{
+    color: black;
+    position: absolute;
+    right: 4px;
+    top: 4px;
+    background-color: rgba(255,255,255,0.92);
+    border: 1px solid black;
+    border-radius: 3px;
+    padding-right: 2px;
+    padding-left: 2px;
+}
+#searchMouth{
+    border:0px;
+    color: grey;
+    background-color: transparent;
+}
+#searchMouth:focus{
+    outline: 0;
+    outline: none;
+}
+#searchBtn{
+    width: 18px;
+    height: 18px;
+    border: 0px;
+    background-image: url('/images/myIconSet.png');
+    background-color: transparent;
+    background-position: -47px 1px;
+    background-repeat: no-repeat
+}
+#objectizeBtn{
+    width: 18px;
+    height: 18px;
+    border: 0px;
+    background-image: url('/images/myIconSet.png');
+    background-color: transparent;
+    background-position: -215px 1px;
+    background-repeat: no-repeat;
+}
+#passKeyBox{
+    display: none;
+    border:0px;
+    color: grey;
+    background-color: transparent;
+}
+#passKeyBox:focus{
+    outline: 0;
+    outline: none;
+}
+#roleTool{
+}
+.floatingElement{
+    position: absolute;
+    z-index: 6;
+    display: block;
+}
+.ibtn{
+    padding: 1px;
+    cursor: pointer;
+}
+.MRC{
+    position: absolute;
+    right: 0px;
+    opacity: 0.2;
+    background-color: lightBlue;
+    border-radius: 4px;
+    padding-left: 2px;
+    padding-right: 2px;
+    z-index: 2;
+}
+.MRC:hover{
+    opacity: 1;
+    cursor: pointer;
+}
+
+.qq-upload-button {
+    display:block; /* or inline-block */
+    width: 110px; padding: 2px 0; text-align:center;    
+    background:#880000; border-bottom:1px solid #ddd;color:#fff;
+}
+.qq-upload-button-hover {background:#cc0000;}
+.qq-upload-button-focus {outline:1px dotted black;}
+.cmenuItem:hover{
+    background-color: #99f
+}
+h1{
+    margin:0px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+input[type="button"], input[type="submit"], input[type="reset"], button {
+    border: 1px solid black;
+    border-radius: 2px;
+    padding: 2px;
+    margin: 1px;
+    line-height: 14px;
+    background-color: #eef;
+}
+input[type="button"]:focus,input[type="submit"]:focus,input[type="reset"]:focus,button:focus{
+    background-color: #000;
+}
+input[type="button"]:hover,input[type="submit"]:hover,input[type="reset"]:hover,button:hover{
+    background-color: #fff;
+    cursor: pointer;
+}

@@ -1,0 +1,77 @@
+<?php
+/* Author: Gowtham */
+//2012-03-21 06:44:00
+
+$adminLevelDecoder=array(
+    'A'=>array(
+        'label'=>'ECE',
+        'subDepts'=>array()
+        ),
+    'B'=>array(
+        'label'=>'CSE',
+        'subDepts'=>array()
+        ),
+    'C'=>array(
+        'label'=>'MECH',
+        'subDepts'=>array()
+        ),
+    'D'=>array(
+        'label'=>'IT',
+        'subDepts'=>array()
+        ),
+    'E'=>array(
+        'label'=>'EEE',
+        'subDepts'=>array()
+        ),
+    'F'=>array(
+        'label'=>'CIV',
+        'subDepts'=>array()
+        ),
+    'G'=>array(
+        'label'=>'CHEM',
+        'subDepts'=>array()
+        ),
+    'a'=>array(
+        'label'=>'ADMISSIONS',
+        'adminLevel'=>array()
+        ),
+    'b'=>array(
+        'label'=>'ACADAMICS',
+        'adminLevel'=>array()
+        ),
+    'c'=>array(
+        'label'=>'ACCOUNTS',
+        'adminLevel'=>array()
+        ),
+    'f'=>array(
+        'label'=>'FINANCIAL',
+        'adminLevel'=>array()
+        ),
+    'r'=>array(
+        'label'=>'REVENUE',
+        'adminLevel'=>array()
+        ),
+    't'=>array(
+        'label'=>'TRANSPORT',
+        'adminLevel'=>array()
+        ),
+    'p'=>array(
+        'label'=>'PRODUCTION',
+        'adminLevel'=>array()
+        ),
+    'h'=>array(
+        'label'=>'HR',
+        'adminLevel'=>array()
+        ),
+    '0'=>array(
+        'label'=>'HOD'
+        ),
+    '6'=>array(
+        'label'=>'LECTURER'
+    ),
+    '7'=>array(
+        'label'=>'STUDENT'
+    )
+);
+
+?>

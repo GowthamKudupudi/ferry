@@ -1,0 +1,210 @@
+/* 
+    Document   : coreStyleSheet
+    Created on : Nov 22, 2011, 5:47:18 PM
+    Author     : gowtham
+    Description:
+        Purpose of the stylesheet follows.
+*/
+
+/* 
+   TODO customize this sample style
+   Syntax recommendation http://www.w3.org/TR/REC-CSS2/
+*/
+
+root { 
+    display: block;
+}
+body {
+    font-family: "lucida grande",tahoma,verdana,arial,sans-serif;
+    font-size: 14px;
+    cursor: default
+}
+
+.holder:hover{
+    cursor: move;
+}
+.logMsg{
+    background-color: #DDF;
+    margin: 1px;
+    border: 1px solid #EEF;
+    padding: 0px 1px 0px 1px;
+    color: black;
+}
+.msgPanel {
+    display: block;
+    position: fixed;
+    z-index: 6;
+    background-color: #AAF;
+    opacity: 0.9;
+    padding: 1px;
+    border: 1px solid #88F;
+    box-shadow: 
+        1px 1px 0 rgba(0, 0, 0, 0.45) inset,
+        -1px -1px 0 rgba(0, 0, 0, 0.45) inset,
+        0 2px 5px rgba(0,0,0,0.25);
+    float: left;
+}
+.panelBody{
+    overflow: auto;
+}
+#header{
+    position: fixed;
+    visibility: visible;
+    z-index: 6;
+    color: white;
+    height: 70px;
+    width:100%
+}
+#headerBackground{
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 70px;
+    background-color: black;
+    z-index: 5;
+    opacity: 0.72;
+}
+.panelBody::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+.panelBody::-webkit-scrollbar-button {
+    display: none;
+}
+.panelBody::-webkit-scrollbar-corner {
+    background: transparent;
+}
+.panelBody::-webkit-scrollbar-thumb {
+    border-radius: 17px;
+    background: #111;
+    border: 2px solid transparent;
+}
+.panelBody::-webkit-scrollbar-track-piece {
+    background-color: transparent;
+}
+#body{
+    position:relative;
+    left: 0px;
+    top: 0px;
+    overflow: auto;
+}
+#body::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+#body::-webkit-scrollbar-button {
+    display: none;
+}
+#body::-webkit-scrollbar-corner {
+    background: white;
+}
+#body::-webkit-scrollbar-thumb {
+    border-radius: 17px;
+    background: grey;
+    border: 2px solid white;
+}
+#body::-webkit-scrollbar-track-piece {
+    background-color: white;
+}
+#bodySpace{
+    position: relative;
+    top: 0px;
+    left: 0px;
+}
+#logo{
+    position: absolute;
+}
+#signInTool{
+    position: absolute;
+    left: 85px;
+}
+#register_Btn{
+    position: absolute;
+    left: 602px;
+}
+#homeBtn{
+    position: absolute;
+    left: 83px;
+    top: 36px;
+}
+#statusBar{
+    position: absolute;
+    left: 105px;
+    top: 32px;
+    color: #55f;
+    font-size: 16px;
+}
+#footer{
+    position: fixed;
+    bottom: 8px;
+    right: 8px;
+    z-index: 8;
+}
+#welcomeUser{
+    position: absolute;
+    left: 87px;
+    top: 3px;
+    color: white;
+}
+#userProfileBtn{
+    position: absolute;
+    left: 210px;
+}
+#signOutTool{
+    position: absolute;
+    left: 296px;
+}
+#searchTool{
+    color: black;
+    position: absolute;
+    right: 0px;
+    top: 0px;
+    background-color: white;
+    opacity: 0.9;
+    border: 1px solid black;
+}
+#roleTool{
+    position: absolute;
+    left: 366px;
+    top: 1px
+}
+.floatingElement{
+    position: absolute;
+    z-index: 6;
+    display: block;
+}
+.ibtn{
+    padding: 1px;
+    cursor: pointer;
+}
+.MRC{
+    position: absolute;
+    right: 0px;
+    opacity: 0.2;
+    background-color: lightBlue;
+    border-radius: 4px;
+    padding-left: 2px;
+    padding-right: 2px;
+    z-index: 2;
+}
+.MRC:hover{
+    opacity: 1;
+    cursor: pointer;
+}
+
+.qq-upload-button {
+    display:block; /* or inline-block */
+    width: 110px; padding: 2px 0; text-align:center;    
+    background:#880000; border-bottom:1px solid #ddd;color:#fff;
+}
+.qq-upload-button-hover {background:#cc0000;}
+.qq-upload-button-focus {outline:1px dotted black;}
+.cmenuItem:hover{
+    background-color: #99f
+}
+h1{
+    margin:0px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}

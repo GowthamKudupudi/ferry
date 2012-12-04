@@ -1,0 +1,186 @@
+/* 
+    Document   : sortable
+    Created on : Nov 29, 2011, 11:02:47 PM
+    Author     : Gowtham <gowtham@ferryfair.com>
+    Description:
+        Purpose of the stylesheet follows.
+*/
+
+/* 
+   TODO customize this sample style
+   Syntax recommendation http://www.w3.org/TR/REC-CSS2/
+*/
+
+a img {
+    border: 0;
+}
+
+table.sortable {
+    border-spacing: 0;
+    border: 1px solid #000;
+    border-collapse: collapse;
+}
+
+table.sortable #tHR{
+    border: 1px solid black;
+}
+
+table.sortable th, table.sortable td {
+    border-width: 0px 1px 0px 1px;
+    text-align: left;
+    padding: 2px 4px 2px 4px;
+    border-style: solid;
+    border-color: #444;
+}
+
+table.sortable th {
+    background-color: #ccc;
+    font-size: 17px;
+    font-family: courier;
+    font-weight: normal;
+}
+
+table.sortable th.active{
+    background-color: rgba(0,0,255,0.5)
+}
+
+table.sortable td {
+    border-width: 0px 1px 0px 1px;
+    font-size: 15px;
+    padding:1px;
+}
+
+table.sortable td.active{
+    background-color: #88f;
+}
+
+table.sortable td:focus{
+    outline-width: 2px;
+    outline-color: #000;
+}
+
+table.sortable td.selected{
+    background-color: #bbf
+}
+
+table.sortable td.dc:hover{
+    background-color: #bbf
+}
+
+table.sortable tr{
+    height: 22px
+}
+
+table.sortable tr.odd {
+    background-color: #ddd;
+}
+
+table.sortable tr.even {
+    background-color: #fff;
+}
+
+table.sortable tr.sortbottom {
+    border: 1px solid #444;
+    background-color: #ccc;
+    font-weight: bold;
+}
+
+table.sortable tr.sortbottom td{
+    height: 19px
+}
+
+.inputCell{
+    font-size: 15px;
+    margin: 0px;
+    padding: 0px;
+    border: 0px;
+}
+
+table.sortable select.inputCell{
+    background-color: white
+}
+
+.inputCell:focus{
+    outline: 0;
+    outline: none;
+}
+
+table.sortable .hidden{
+    display: none
+}
+
+table.sortable button.ibtn{
+    background-color: transparent;
+    background-image: url('/images/myIconSet.png');
+    background-repeat: no-repeat;
+    background-color: transparent;
+    width: 14px;
+    height: 14px;
+    border: 0px;
+    border-radius: 2px;
+}
+
+table.sortable button.ibtn:hover{
+    background-color: rgba(250,200,200,0.5);
+    cursor: pointer;
+    box-shadow: rgba(0, 0, 0, 0.246094) 2px 2px 5px;
+}
+
+table.sortable button.ibtn:active{
+    box-shadow: rgba(0, 0, 0, 0.246094) 1px 1px 2px;
+}
+
+table.sortable button.ibtn[disabled]{
+    cursor: default;
+}
+
+table.sortable button.ibtn[disabled]:hover{
+    cursor: default;
+    box-shadow:none;
+    background-color: transparent;
+}
+
+table.sortable button.ibtn[disabled]:active{
+    cursor: default;
+    bod-shadow:none;
+}
+
+table.sortable button.ibtn.del{
+    background-position: -168px -96px
+}
+
+table.sortable button.ibtn.add{
+    background-position: -408px -96px
+}
+
+table.sortable button.ibtn.auth{
+    background-position: -288px -24px
+}
+
+table.sortable th a.sortheader:hover{
+    cursor:pointer;
+}
+
+table.sortable #up{
+    background-position: -288px -120px
+}
+
+table.sortable #top{
+    background-position: -288px -120px
+}
+
+table.sortable #down{
+    background-position: -312px -120px
+}
+
+table.sortable #bottom{
+    background-position: -312px -120px
+}
+
+table.sortable #allOrFew{
+    background-position: -432px -120px
+}
+
+table.sortable #tableTools #print{
+    background-position: -96px -48px
+}

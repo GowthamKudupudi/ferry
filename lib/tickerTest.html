@@ -1,0 +1,46 @@
+<!--
+To change this template, choose Tools | Templates
+and open the template in the editor.
+-->
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    </head>
+    <body>
+        <script type="text/javascript">
+            init=function(){
+                clockDisplay=document.getElementById('clockDisplay');
+                return false;
+            }
+            var startTicker=function(){
+                window.xhr=new XMLHttpRequest();
+                xhr.open('GET','/lib/tickerTest.php',true);
+                xhr.onreadystatechange=function(){
+                    if(xhr.readyState==3){
+                        clockDisplay.innerHTML=xhr.responseText;
+                    }
+                    return false;
+                }
+                xhr.send();
+            }
+            var displayTicker=function(xhr){
+                sicounter++;
+                var cd=document.getElementById('clockDisplay');
+                if(xhr.responseText!=''){
+                    cd.innerHTML=xhr.responseText;
+                    xhr.responseText='';
+                }
+                if(sicounter>60){
+                    window.clearInterval(si);
+                }
+                return false;
+            }
+            window.onload=init;
+        </script>
+        <script type="text/javascript" src="/lib/test.js" onload="alert('hi onload');"></script>
+        <button id="strtTicker" onclick="startTicker();return false">StartTicker</button>
+        <div id="clockDisplay"></div>
+    </body>
+</html>

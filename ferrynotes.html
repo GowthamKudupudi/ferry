@@ -1,0 +1,77 @@
+<!--
+To change this template, choose Tools | Templates
+and open the template in the editor.
+-->
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <style type="text/css">
+            .flip-horizontal {
+                -moz-transform: scaleX(-1);
+                -webkit-transform: scaleX(-1);
+                -o-transform: scaleX(-1);
+                transform: scaleX(-1);
+                -ms-filter: fliph; /*IE*/
+                filter: fliph; /*IE*/
+            }
+            .flip-vertical {
+                -moz-transform: scaleY(-1);
+                -webkit-transform: scaleY(-1);
+                -o-transform: scaleY(-1);
+                transform: scaleY(-1);
+                -ms-filter: flipv; /*IE*/
+                filter: flipv; /*IE*/
+            }
+            #toolBox{
+                margin: auto;
+                text-align: center
+            }
+            #plusSize{
+                background-image: url('/images/png.png');
+                background-position: -84px 0px;
+            }
+            #minusSize{
+                background-image: url('/images/png.png');
+                background-position: -84px 0px;
+            }
+            button {
+                border: 1px solid black;
+                border-radius: 2px;
+                padding: 2px;
+                margin: 1px;
+                line-height: 14px;
+                background-color: #eef;
+            }
+            button:focus{
+                background-color: #000;
+            }
+            button:hover{
+                background-color: #fff;
+                cursor: pointer;
+            }
+            .tb{
+                width: 22px;
+                height: 22px;
+                margin: auto;
+            }
+            #notes{
+                position: relative;
+                width:100%;
+                height:100%
+            }
+            #notes:focus{
+                outline: 0;
+                outline: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="toolBox">
+            <button id="plusSize" class="tb"></button>
+            <button id="minusSize" class="flip-horizontal tb"></button>
+        </div>
+        <div id="notes" contenteditable>TODO write content</div>
+    </body>
+</html>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+    Document   : crap.xml
+    Created on : March 22, 2012, 2:10 PM
+    Author     : gowtham
+    Description:
+        Purpose of the document follows.
+-->
+
+<root>
+    <one>
+        <![CDATA[
+            <table>
+                <tr>
+                    <td>gowtham</td>
+                    <td>good</td>
+                </tr>
+                <tr>
+                    <td>chaitu</td>
+                    <td>very bad</td>
+                </tr>
+            </table>
+        ]]>
+    </one>
+    <two>
+        <![CDATA[
+            <script type="text/javascript">
+                statusField.innerHTML='xml loaded';
+            </script>
+        ]]>
+    </two>
+</root>

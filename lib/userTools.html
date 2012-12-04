@@ -1,0 +1,279 @@
+<html>
+    <head>
+        <title>User tools</title>
+    </head>
+    <body>
+        <div id="dbTableExecuterTool" class="tool">
+            <style type="text/css" scoped>
+                #dbTableQueryForm{
+                    border: 1px solid #777;width: 600px;line-height: 22px;padding-left: 5px;
+                }
+                #refresh{
+                    width: 18px;
+                    height: 18px;
+                    border: 0px;
+                    background-color: transparent;
+                    background-image: url('/images/myIconSet.png');
+                    background-position: -213px -22px;
+                }
+                #query{
+                    width: 18px;
+                    height: 18px;
+                    border: 0px;
+                    background-image: url('/images/myIconSet.png');
+                    background-color: transparent;
+                    background-position: -93px -94px;
+                }
+                #tableNameInputField{
+                    width: 545px;
+                    border: 0px;
+                    margin: 2px 2px 2px 2px;
+                    padding: 1px;
+                    background-color: white;
+                    color: gray;
+                }
+                #tableNameInputField:focus{
+                    outline: 0;
+                    outline: none;
+                }
+                #queryLogTimeSorted,#queryLogAlphabetSorted, .helpList{
+                    position: absolute;
+                    width: 547px;
+                    height: 400px;
+                    left: 52px;
+                    border-top-width: 1px;
+                    border-right-width: 1px;
+                    border-bottom-width: 1px;
+                    border-left-width: 1px;
+                    border-top-style: solid;
+                    border-right-style: solid;
+                    border-bottom-style: solid;
+                    border-left-style: solid;
+                    border-color: orange;
+                    border-image: initial;
+                    box-shadow: rgba(0, 0, 0, 0.449219) 0px 0px 0px inset, rgba(0, 0, 0, 0.449219) 0px 0px 0px inset, rgba(0, 0, 0, 0.246094) 0px 2px 5px;
+                    background-color: rgba(255, 230, 230, 0.95);
+                    border-color: orange;
+                    overflow: auto;
+                    overflow-x: hidden;
+                    overflow-y:hidden;
+                    z-index: 2;
+                }
+                .logItem,.fillHelpItem{
+                    padding: 1px;
+                    font-size: 14px;
+                    font-weight: normal;
+                    height: 16px;
+                    white-space: nowrap;
+                }
+                .logItem.active, .helpList .active{
+                    background-color: #ffa07a
+                }
+                .fillHelpItem.active{
+                    background-color: #ffa07a
+                }
+            </style>
+            <form id="dbTableQueryForm" class="display" onsubmit="dbTableExecuterTool.loadGadget.apply(dbTableExecuterTool,[false]); return false;" style="position:relative">
+                <input id="query" title="Query" type="submit" value=""/>
+                <button id="refresh" title="Refresh" onclick="dbTableExecuterTool.loadGadget.apply(dbTableExecuterTool,[true]); return false;"></button>
+                <input id="tableNameInputField" autocomplete="off" type="text" value="Query a table. Enter a table query or simply a table name." spellcheck="false" onfocus="if(this.style.color!='black'){this.style.color='black';this.value='';return false;}" onblur="if(this.value==''){this.style.color='grey';this.value='Query a table. Enter a table query or simply a table name.';}return false;"/>
+                <div id="queryLogTimeSorted" style="display:none"></div>
+                <div id="queryLogAlphabetSorted" style="display:none"></div>
+                <div id="colNamesList" style="display:none"></div>
+                <div id="mathFuncList" style="display:none" class="helpList"><div id="LN10">LN10</div><div id="LN2">LN2</div><div id="LOG10E">LOG10E</div><div id="LOG2E">LOG2E</div><div id="PI">PI</div><div id="SQRT1_2">SQRT1_2</div><div id="SQRT2">SQRT2</div><div id="abs">abs</div><div id="acos">acos</div><div id="asin">asin</div><div id="atan">atan</div><div id="atan2">atan2</div><div id="AVERAGE">AVERAGE</div><div id="ceil">ceil</div><div id="CONAVG">CONAVG</div><div id="COUNTIF">COUNTIF</div><div id="exp">exp</div><div id="floor">floor</div><div id="log">log</div><div id="max">max</div><div id="min">min</div><div id="pow">pow</div><div id="LN2">LN2</div><div id="random">random</div><div id="round">round</div><div id="ROUND">ROUND</div><div id="sin">sin</div><div id="sqrt">sqrt</div><div id="SUM">SUM</div><div id="tan">tan</div></div>
+            </form>
+            <div id="displayArea"></div>
+            <script type="text/javascript" src="/lib/dbTableExecuterTool.js" onload="
+                var dET=this.parentElement;
+                dET.dispArea=dET.children['displayArea'];
+                dET.dbTableQueryForm=dET.children['dbTableQueryForm'];
+                dET.tableNameInputField=dET.dbTableQueryForm.children['tableNameInputField'];
+                dET.tableNameInputField.qlts=dET.dbTableQueryForm.children['queryLogTimeSorted'];
+                dET.tableNameInputField.qlas=dET.dbTableQueryForm.children['queryLogAlphabetSorted'];
+                dET.tableNameInputField.cNL=dET.dbTableQueryForm.children['colNamesList'];
+                dET.tableNameInputField.mFHL=dET.dbTableQueryForm.children['mathFuncList'];
+                dET.tableNameInputField.onkeypress=dET.keyPressHandler;
+                dET.tableNameInputField.onkeydown=dET.keyDownHandler;
+                dET.afterLoadScript=function(){}
+                var feed={
+                    content:{
+                        query:'tableQueryLogs'
+                    },
+                    postExpedition:function(feed){
+                        var logItems=feed.responseXML.getElementsByTagName('tablequerylogs')[0].textContent.split('$,$');
+                        var ql=null;
+                        var qlts=dbTableExecuterTool.tableNameInputField.qlts;
+                        var qlas=dbTableExecuterTool.tableNameInputField.qlas;
+                        for(var i=logItems.length-1;i>-1;i--){
+                            ql=document.createElement('div');
+                            ql.classList.add('logItem');
+                            ql.innerHTML=logItems[i];
+                            qlts.appendChild(ql);
+                        }
+                        logItems.sort();
+                        for(var i=0;i<logItems.length;i++){
+                            ql=document.createElement('div');
+                            ql.classList.add('logItem');
+                            ql.innerHTML=logItems[i];
+                            qlas.appendChild(ql);
+                        }
+                        dbTableExecuterTool.queryStack=logItems;
+                        qlas.style.display=null;
+                        qlts.style.display=null;
+                        if(qlas.offsetHeight>150){qlas.style.height='150px'}
+                        if(qlts.offsetHeight>150){qlts.style.height='150px'}
+                        qlas.style.display='none';
+                        qlts.style.display='none';
+                    }
+                }
+                feed.ferry=new core.shuttle('/lib/fetchUserData.php', null, feed.postExpedition, feed);
+                dET.tableNameInputField.addEventListener('blur',function(){
+                    if(this.activeHelper)this.activeHelper.style.display='none';
+                },false);
+                core.mbody.addEventListener('scroll',function(){
+                    dbTableExecuterTool.dbTableQueryForm.style.left=core.mbody.scrollLeft+'px';
+                })"></script>
+        </div>
+        <div id="inboxOpener" class="tool">
+            <button id="openInbox" class="display" onclick="openInbox.loadGadget.call(this);return false;">Inbox</button>
+            <div id="displayArea" class="display"></div>
+            <script type="text/javascript">
+                window.openInbox={
+                    dispArea:null,
+                    afterLoadScript:function(){},
+                    loadGadget:function(){
+                        openInbox.dispArea=this.parentElement.children['displayArea'];
+                        var displayArea=openInbox.dispArea;
+                        if(displayArea && (displayArea.childNodes.length<1 || displayArea.style.display!='none')){
+                            this.dispArea=displayArea;
+                            this.gadgetLoader=new core.loadAsGadget2('/lib/inboxBrowser.php','',openInbox.dispArea,'Inbox opened.');
+                        }else{
+                            if(displayArea){
+                                displayArea.style.display=null;
+                            }else{
+                                this.dispArea.mrc.panelBtn.panel.dePanelizeBtn.onclick.call(this.dispArea.mrc.panelBtn.panel.dePanelizeBtn)
+                            }
+                        }
+                    }
+                }
+            </script>
+        </div>
+        <div id="chatTool" class="tool">
+            <button id="openChat" class="display" onclick="openChat.loadGadget.call(this);return false;">Chat</button>
+            <div id="displayArea" class="display"></div>
+            <script type="text/javascript">
+                window.openChat={
+                    dispArea:null,
+                    afterLoadScript:function(){},
+                    loadGadget:function(){
+                        openChat.dispArea=this.parentElement.children['displayArea'];
+                        var displayArea=openChat.dispArea;
+                        if(displayArea && (displayArea.childNodes.length<1 || displayArea.style.display!='none')){
+                            this.dispArea=displayArea;
+                            this.gadgetLoader=new core.loadAsGadget2('/lib/chatWindow.php', '', openChat.dispArea);
+                        }else{
+                            if(displayArea){
+                                displayArea.style.display=null;
+                            }else{
+                                this.dispArea.mrc.panelBtn.panel.dePanelizeBtn.onclick.call(this.dispArea.mrc.panelBtn.panel.dePanelizeBtn)
+                            }
+                        }
+                        return false;
+                    }
+                }
+            </script>
+        </div>
+        <div id="keelCrafter" class="tool">
+            <button id="keelCrafterBtn" title="opens tools to create objects, groups, tasks" onclick="keelCrafter.loadGadget.call(this);return false;">KeelCrafter</button>
+            <div id="displayArea"></div>
+            <script type="text/javascript">
+                window.keelCrafter={
+                    dispArea:null,
+                    afterLoadScript:function(){},
+                    loadGadget:function(){
+                        keelCrafter.dispArea=this.parentElement.children['displayArea'];
+                        var displayArea=keelCrafter.dispArea;
+                        if(displayArea && (displayArea.childNodes.length<1 || displayArea.style.display!='none')){
+                            this.dispArea=displayArea;
+                            this.gadgetLoader=new core.loadAsGadget2('/lib/keelForm.php', '', keelCrafter.dispArea);
+                        }else{
+                            if(displayArea){
+                                displayArea.style.display=null;
+                            }else{
+                                this.dispArea.mrc.panelBtn.panel.dePanelizeBtn.onclick.call(this.dispArea.mrc.panelBtn.panel.dePanelizeBtn)
+                            }
+                        }
+                        return false;
+                    }
+                }
+            </script>
+        </div>
+        <div id="dataGrabberTool" class="tool">
+            <button id="dataGrabberToolBtn" title="opens tools to create objects, groups, tasks" onclick="dataGrabberTool.loadGadget.call(this);return false;">DataGrabber</button>
+            <div id="displayArea"></div>
+            <script type="text/javascript">
+                window.dataGrabberTool={
+                    dispArea:null,
+                    afterLoadScript:function(){},
+                    loadGadget:function(){
+                        dataGrabberTool.dispArea=this.parentElement.children['displayArea'];
+                        var displayArea=dataGrabberTool.dispArea;
+                        if(displayArea && (displayArea.childNodes.length<1 || displayArea.style.display!='none')){
+                            this.dispArea=displayArea;
+                            this.gadgetLoader=new core.loadAsGadget2('/lib/dataGrabberForm.php', '', dataGrabberTool.dispArea);
+                        }else{
+                            if(displayArea){
+                                displayArea.style.display=null;
+                            }else{
+                                this.dispArea.mrc.panelBtn.panel.dePanelizeBtn.onclick.call(this.dispArea.mrc.panelBtn.panel.dePanelizeBtn)
+                            }
+                        }
+                        return false;
+                    }
+                }
+            </script>
+        </div>
+        <div id="deobjectizeTool" class="tool">
+            <form id="deobjectizeForm" class="display" onsubmit="deobjectizeTool.loadGadget.apply(this,[this]); return false;">
+                <label>Object ID: </label>
+                <input id="objectId" type="text"/>
+                <input type="submit" value="Deobjectize"/>
+                <div id="displayArea"></div>
+            </form>
+            <script type="text/javascript">
+                window.deobjectizeTool={
+                    dispArea:null,
+                    afterLoadScript:function(){},
+                    loadGadget:function(){
+                        deobjectizeTool.dispArea=this.children['displayArea'];
+                        var displayArea=deobjectizeTool.dispArea;
+                        if(displayArea && (displayArea.childNodes.length<1 || displayArea.style.display!='none')){
+                            this.dispArea=displayArea;
+                            var feed=new Object();
+                            feed.content={
+                                objectId:this.children['objectId'].value
+                            }
+                            feed.elm=this;
+                            feed.postExpedition=function(feed){
+                                if(feed.responseXML.getElementsByTagName('status')[0].firstChild.nodeValue=='success'){
+                                    statusField.innerHTML=feed.elm.children['objectId'].value+' got successfully deobjectized ~:)~';
+                                }else{
+                                    statusField.innerHTML=feed.responseXML.getElementsByTagName['status'][0].textContent;
+                                }
+                                return false;
+                            }
+                            feed.ferry=new core.shuttle('/lib/adminScripts/deobjectize.php', null, feed.postExpedition, feed);
+                        }else{
+                            if(displayArea){
+                                displayArea.style.display=null;
+                            }else{
+                                this.dispArea.mrc.panelBtn.panel.dePanelizeBtn.onclick.call(this.dispArea.mrc.panelBtn.panel.dePanelizeBtn)
+                            }
+                        }
+                        return false;
+                    }
+                }
+            </script>
+        </div>
+    </body>
+</html>
