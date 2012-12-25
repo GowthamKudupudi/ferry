@@ -478,5 +478,5 @@ if (domesticSlave($userAdminLevel, 'Zz9')) {
 /* $spv=shm_put_var($dbtShmId, $dbtKey, $liveDBTable);
   $sr=sem_release($dbtSemId); */
 closeLiveTable($dbTable, &$liveDBTable);
-include db_logout . php
+include "db_logout.php"
 ?>

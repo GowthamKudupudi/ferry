@@ -8,7 +8,7 @@ header('Cache-Control: no-cache');
 header('Cache-Control: no-store', false);
 echo '<userdata>';
 $qData=  explode(",", $_POST['query']);
-$df=$root."/userFiles/".$_SESSION['username']."/data.json";
+$df="$DIR_userFiles/${_SESSION['username']}/data.json";
 $fp=  fopen($df, 'a+');
 $fd=  fread($fp, filesize($df));
 $df=  json_decode($fd);

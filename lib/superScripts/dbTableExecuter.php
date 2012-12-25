@@ -668,7 +668,7 @@ if (domesticSlave($_SESSION['adminLevel'], 'Zz8')) {
                         $error1 = mysql_error($dbc);
                         if (!$error1) {
                             $dbtUpdate['tables'][$dbTable]['op']['renametableName']['newName'] = $newName;
-                            $exec = exec("mv $root/dbTableData/$dbTable $root/dbTableData/$newName");
+                            $exec = exec("mv $DIR_dbTableData/$dbTable $DIR_dbTableData/$newName");
                             $_SESSION['tables'][$newName] = &$_SESSION['tables'][$dbTable];
                             unset($_SESSION['tables'][$dbTable]);
                             echo '<status>success</status>';
@@ -724,7 +724,7 @@ if (domesticSlave($_SESSION['adminLevel'], 'Zz8')) {
                         $result = mysql_query($query, $dbc);
                         $error1 = mysql_error($dbc);
                         if (!$error1) {
-                            $fn = "$root/dbTableData/$dbTable";
+                            $fn = "$DIR_dbTableData/$dbTable";
                             $fp = fopen($fn, 'a+');
                             $tp = fread($fp, filesize($fn));
                             fclose($fp);
@@ -929,7 +929,7 @@ if (domesticSlave($_SESSION['adminLevel'], 'Zz8')) {
                         $result = mysql_query($query, $dbc);
                         $error1 = mysql_error($dbc);
                         if (!$error1) {
-                            exec("rm $root/dbTableData/$dbTable");
+                            exec("rm $DIR_dbTableData/$dbTable");
                             echo '<status>success</status>';
                             $dbtUpdate['tables'][$dbTable]['op']['delTable'] = true;
                         } else {

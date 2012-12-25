@@ -1,5 +1,6 @@
 <?php
 /* Author: Gowtham */
+require "${_SERVER['DOCUMENT_ROOT']}/conf.php";
 if($_POST['SESSION_ID']){
     session_id($_POST['SESSION_ID']);
 }

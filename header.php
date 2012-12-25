@@ -31,7 +31,7 @@
         <span id="statusBar"><button id="logBtn" onclick="if(this.logPanel.style.display=='none'){this.logPanel.style.display=null}if(!document.getElementById('logPanel')){core.header.appendChild(this.logPanel);}this.logPanel.reAlign();return false;">Log</button>&nbsp;<span id="statusField">Welcome to <?php echo $orgName;?></span></span>
     </div>
     <form id="searchTool" class="home" target="dummyIf">
-        <input id="searchMouth" style="margin-left: 2px; width:207px" onfocus="if(this.style.color!='black'){this.style.color='black';this.value='';return false;}" onblur="if(this.value==''){this.style.color='grey';this.value='Search';}return false;" value="Search"/>
+        <input id="searchMouth" style="margin-left: 2px; width:207px" onfocus="if(this.style.color!='black'){this.style.color='black';this.value='';return false;}" onblur="if(this.value==''){this.style.color='grey';if(searchTool.passKeyBox.offsetHeight>0){this.value='Type-in ObjectId'}else{this.value='Search'}}return false;" value="Search"/>
         <input type="submit" id="searchBtn" value="" title="Search"/>
         <button id="objectizeBtn" title="Objectize"></button><br/>
         <input id="passKeyBox" style="margin-left: 2px; width:207px" onfocus="if(this.style.color!='black'){this.style.color='black';this.value='';return false;}" onblur="if(this.value==''){this.style.color='grey';this.value='Type-in PassKey';}return false;" value="Type-in PassKey" />
