@@ -1,5 +1,5 @@
 <?php
-    $db_host="db.ferryfair.com";
+    $db_host="localhost";
     $db_user="collegedb2Reader";
     $db_password="123BlackBox";
     $db_database="collegeDB2";

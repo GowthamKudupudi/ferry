@@ -1,5 +1,5 @@
 <?php
-    $db_host="db.ferryfair.com";
+    $db_host="mysql.newmeksolutions.com";
     $db_user="cdbadmin";
     $ts_user="colldb2tsWriter";
     $u_user="colldb2uWriter";

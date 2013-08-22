@@ -1,0 +1,4 @@
+{"ts":1375875591664,"silentsave":true,"restoring":false,"patch":[[]],"length":0}
+{"contributors":[],"silentsave":false,"ts":1375875646274,"patch":[[{"diffs":[[1,"console.log(\"Hello world\");"]],"start1":0,"start2":0,"length1":0,"length2":27}]],"length":27,"saved":false}
+{"contributors":[],"silentsave":false,"ts":1375882605086,"patch":[[{"diffs":[[0,"world\");"],[1,"hi"]],"start1":19,"start2":19,"length1":8,"length2":10}]],"length":29,"saved":false}
+{"ts":1375882714558,"patch":[[{"diffs":[[0,"d\");"],[-1,"hi"]],"start1":23,"start2":23,"length1":6,"length2":4}]],"length":27,"saved":false}
