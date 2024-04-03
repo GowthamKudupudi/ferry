@@ -165,9 +165,9 @@ int readConfig() {
    }
    std::ifstream hfile ("/etc/hostname", ios::ate | ios::in);
    if (!hfile .is_open()) {
-      ffl_err (0, "/etc/hostname not found.");
+      ffl_err (FPL_MAIN, "/etc/hostname not found.");
       exit (-1);
-   }   
+   }
    hfile. seekg(ios::end);
    string hostn;
    hostn .reserve (hfile .tellg ());
