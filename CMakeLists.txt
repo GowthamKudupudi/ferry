@@ -9,6 +9,13 @@ cmake_minimum_required (VERSION 3.5)
 project (FerryFair CXX C)
 include (GNUInstallDirs)
 message ("Generating build procedure for ${PROJECT_NAME} ...")
+set(CMAKE_MODULE_PATH
+   "${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase;${CMAKE_MODULE_PATH}"
+)
+message("CMAKE_MODULE_PATH: ${CMAKE_MODULE_PATH}")
+include(TargetArch)
+target_architecture(TARGET_ARCH)
+message ("TARGET_ARCH: ${TARGET_ARCH}")
 
 message ("Extropolating build type ...")
 string (
@@ -46,8 +53,8 @@ endif ()
 if (DEFINED _DEBUG)
    add_definitions (-D_DEBUG=${_DEBUG})
 endif ()
-add_definitions (-DMG_ENABLE_OPENSSL=1)
 add_definitions (-Dcimg_display=0)
+add_definitions (-DMG_ENABLE_OPENSSL=1)
 
 set (VERSION_MAJOR 1)
 set (VERSION_MINOR 0)
@@ -55,6 +62,10 @@ set (Umbrella "ferryfair")
 configure_file (
    "${PROJECT_SOURCE_DIR}/config.h.in"
    "${PROJECT_BINARY_DIR}/config.h"
+)
+configure_file (
+   "${PROJECT_SOURCE_DIR}/config.h.in"
+   "${PROJECT_SOURCE_DIR}/config.h"
 )
 configure_file (
    "${PROJECT_SOURCE_DIR}/config.ffjson"
@@ -121,6 +132,14 @@ else ()
       ${CMAKE_INSTALL_FULL_INCLUDEDIR}/${Umbrella}
    )
 endif ()
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../openssl/install/${TARGET_ARCH}")
+   link_directories (
+      "${CMAKE_CURRENT_SOURCE_DIR}/../openssl/install/${TARGET_ARCH}/lib"
+   )
+   include_directories (
+      ${CMAKE_CURRENT_SOURCE_DIR}/../openssl/install/${TARGET_ARCH}/include
+   )
+endif()
 if (macOS)
    include_directories (/usr/local/opt/openssl/include)
    link_directories (/usr/local/opt/openssl/lib)

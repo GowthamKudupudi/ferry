@@ -395,8 +395,10 @@ void fn_tls (
 ) {
    if (ev == MG_EV_ACCEPT) {
       struct mg_tls_opts opts = {
-         .cert = "/etc/letsencrypt/live/ferryfair.com/cert.pem",
-         .certkey = "/etc/letsencrypt/live/ferryfair.com/privkey.pem"
+//         .cert = "/etc/letsencrypt/live/ferryfair.com/cert.pem",
+//         .certkey = "/etc/letsencrypt/live/ferryfair.com/privkey.pem"
+         .cert = "/etc/letsencrypt/live/ferryfair.com2/signed_chain.crt",
+         .certkey = "/etc/letsencrypt/live/ferryfair.com2/domain.key"
       };
       mg_tls_init(c, &opts);
    }
