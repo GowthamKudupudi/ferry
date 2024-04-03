@@ -150,7 +150,7 @@ void get_cookies (const char* c, FFJSON& fc) {
       ++i;
    }
 }
-
+/*
 void mailfn (
    struct mg_connection *c, int ev, void *ev_data, void *fn_data
 ) {
@@ -214,21 +214,32 @@ void mailfn (
    }
    (void) fn_data, (void) ev_data;
 }
-
-void tls_ntls_common (
-   struct mg_connection* c, int ev, void* ev_data, void* fn_data
+*/
+void fn (
+   struct mg_connection* c, int ev, void* ev_data
 ) {
    struct mg_http_serve_opts opts = {
       .root_dir = (ccp)config["homeFolder"]
    };   // Serve local dir
-   if (ev == MG_EV_HTTP_MSG) {
-      unsigned char b[4];
-      b[0] = c->rem.ip & 0xFF;
-      b[1] = (c->rem.ip >> 8) & 0xFF;
-      b[2] = (c->rem.ip >> 16) & 0xFF;
-      b[3] = (c->rem.ip >> 24) & 0xFF;
-      ffl_notice(FPL_HTTPSERV, "Remote IP: %d.%d.%d.%d",
-                 b[0], b[1], b[2], b[3]);
+   if (ev == MG_EV_ACCEPT) {
+      if (c->fn_data != NULL) {
+         struct mg_tls_opts opts = {
+//          .ca = "/etc/letsencrypt/live/ferryfair.com2/chain.pem",
+            .cert = "/etc/letsencrypt/live/ferryfair.com2/signed_chain.crt",
+            .key = "/etc/letsencrypt/live/ferryfair.com2/domain.key"
+         };
+         mg_tls_init(c, &opts);
+      }
+   } else if (ev == MG_EV_HTTP_MSG) {
+//      unsigned char b[4];
+//      b[0] = c->rem.ip & 0xFF;
+//      b[1] = (c->rem.ip >> 8) & 0xFF;
+//      b[2] = (c->rem.ip >> 16) & 0xFF;
+//      b[3] = (c->rem.ip >> 24) & 0xFF;
+//      ffl_notice(FPL_HTTPSERV, "Remote IP: %d.%d.%d.%d",
+//                 b[0], b[1], b[2], b[3]);
+      ffl_notice(FPL_HTTPSERV, "Remote IP: %s",
+                 c->rem.ip);
       struct mg_http_message* hm = (struct mg_http_message*) ev_data;
       ffl_notice(FPL_HTTPSERV, "hm->uri:\n%s", hm->uri.ptr);
       FFJSON sessionData, vhost, user, cookie, rbs;
@@ -273,9 +284,9 @@ void tls_ntls_common (
                bid=random_alphnuma_string();
                goto bidcheck;
             }
-            rbs[bid]["ip"]=c->rem.ip;
+            rbs[bid]["ip"]=string((char*)c->rem.ip, 16);
            gotbid:
-            if((uint32_t)rbs[bid]["ip"]!=c->rem.ip){
+            if(strcmp((char*)rbs[bid]["ip"],(const char*)c->rem.ip)){
                mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "ipChanged");
                goto done;
             }
@@ -353,7 +364,7 @@ void tls_ntls_common (
          sprintf(mesg, "Open %s://%s/activate?user=%s&key=%s to activate %s",
                  proto, (ccp)sessionData["Host"], username,
                  (ccp)user["activationKey"], username);
-         mg_connect(&mail_mgr, mail_server, mailfn, NULL);
+//         mg_connect(&mail_mgr, mail_server, mailfn, NULL);
          while(!s_quit)
             mg_mgr_poll(&mail_mgr, 100);
          s_quit=false;
@@ -384,25 +395,6 @@ void tls_ntls_common (
    }
 }
 
-void fn (
-   struct mg_connection *c, int ev, void *ev_data, void *fn_data
-) {
-   tls_ntls_common(c, ev, ev_data, fn_data);
-}
-
-void fn_tls (
-   struct mg_connection *c, int ev, void *ev_data, void *fn_data
-) {
-   if (ev == MG_EV_ACCEPT) {
-      struct mg_tls_opts opts = {
-         .cert = "/etc/letsencrypt/live/ferryfair.com/cert.pem",
-         .certkey = "/etc/letsencrypt/live/ferryfair.com/privkey.pem"
-      };
-      mg_tls_init(c, &opts);
-   }
-   tls_ntls_common(c, ev, ev_data, fn_data);
-}
-
 WSServer::WSServer (
    const char* pcHostName, int iDebugLevel,
    int iPort, int iSecurePort, const char* pcSSLCertFilePath,
@@ -425,7 +417,7 @@ WSServer::WSServer (
    char httpport[16];
    sprintf(httpsport, "0.0.0.0:%d", (int)config["HTTPSPort"]);
    sprintf(httpport, "0.0.0.0:%d", (int)config["HTTPPort"]);
-   mg_http_listen(&mgr, httpsport, fn_tls, NULL);
+   mg_http_listen(&mgr, httpsport, fn, (void*)1);
    mg_http_listen(&mgr, httpport, fn, NULL);
    while (!force_exit) {
       mg_mgr_poll(&mgr, 1000);

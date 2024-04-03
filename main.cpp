@@ -1,8 +1,8 @@
 /* Gowtham Kudupudi 24/11/2013
  * ©FerryFair
  * */                                                                          
-#include "global.h"
 #include "config.h"
+#include "global.h"
 #include "WSServer.h"
 #include "FerryStream.h"
 #include "Authentication.h"
@@ -35,6 +35,7 @@
 #include <sys/prctl.h>
 #include <sys/stat.h>
 #include <getopt.h>
+
 
 using namespace std;
 
@@ -165,9 +166,9 @@ int readConfig() {
    }
    std::ifstream hfile ("/etc/hostname", ios::ate | ios::in);
    if (!hfile .is_open()) {
-      ffl_err (0, "/etc/hostname not found.");
+      ffl_err (1, "/etc/hostname not found.");
       exit (-1);
-   }   
+   }
    hfile. seekg(ios::end);
    string hostn;
    hostn .reserve (hfile .tellg ());
