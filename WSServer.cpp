@@ -300,6 +300,10 @@ void tls_ntls_common (
          FFJSON body(string(hm->body.ptr, hm->body.len));
          username=body["username"];password=body["password"];
          ffl_notice(FPL_HTTPSERV, "\nUser: %s\nPass: %s", username, password);
+         if (!vhost["users"][username]) {
+            mg_http_reply(c, 200, headers, "{%Q:%s}", "login","false");
+            goto done;
+         }
          user=&vhost["users"][username];
          cout << "password:" << (ccp)user["password"] << endl;
          if (user["password"] && !user["inactive"] &&
@@ -362,7 +366,7 @@ void tls_ntls_common (
       } else if(strstr((ccp)sessionData["path"], "/activate?")){
          FFJSON data;
          get_data_in_url(sessionData["path"], data);
-         username=data["user"];
+         username=data[""];
          user=&vhost["users"][username];
          headers = "content-type: text/plain\r\n";
          if (!user["password"] || !user["inactive"]) {
@@ -375,6 +379,12 @@ void tls_ntls_common (
          } else {
             mg_http_reply(c, 200, headers, "Wrong key.");
          }
+      } else if(strstr((ccp)sessionData["path"], "/upload")){
+         FFJSON data;
+         get_data_in_url(sessionData["path"], data);
+         ffl_notice(FPL_HTTPSERV, "receiving: %s", (const char*)data["file"]);
+         string upldpth = string(opts.root_dir) + string("/tmp");
+         mg_http_upload(c, hm, &mg_fs_posix, upldpth.c_str(), 9999999);
       } else {
          mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
       }
@@ -397,8 +407,8 @@ void fn_tls (
       struct mg_tls_opts opts = {
 //         .cert = "/etc/letsencrypt/live/ferryfair.com/cert.pem",
 //         .certkey = "/etc/letsencrypt/live/ferryfair.com/privkey.pem"
-         .cert = "/etc/letsencrypt/live/ferryfair.com2/signed_chain.crt",
-         .certkey = "/etc/letsencrypt/live/ferryfair.com2/domain.key"
+         .cert = "/etc/letsencrypt/live/ferryfair.com/signed_chain.crt",
+         .certkey = "/etc/letsencrypt/live/ferryfair.com/domain.key"
       };
       mg_tls_init(c, &opts);
    }

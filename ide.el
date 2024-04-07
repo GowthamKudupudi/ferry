@@ -4,7 +4,6 @@
 
 ;;; Code:
 (defvar CMakeProject "FerryFair")
-(require 'cmake-ide)
 
 (setq cmake-ide-build-dir
       (concat cmake-ide-project-dir "build/Linux/x86-64/debug/"))
