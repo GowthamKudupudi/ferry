@@ -236,6 +236,7 @@ void tls_ntls_common (
       ccp referer=nullptr;char proto[8]="https"; int protolen=5;
       ccp username = nullptr, password = nullptr;
       ccp headers = "content-type: text/json\r\n";
+      string bid;
       parseHTTPHeader((ccp)hm->uri.ptr, hm->uri.len, sessionData);
       if (!sessionData["Host"]) return;
       subdomain=get_subdomain(sessionData["Host"]);
@@ -261,7 +262,6 @@ void tls_ntls_common (
          ffl_notice(FPL_HTTPSERV, "cookie");
          FFJSON inmsg(string(hm->body.ptr, hm->body.len));
          if (inmsg["bid"]){
-            string bid;
             if(strcmp(inmsg["bid"],"undefined")){
                bid=(ccp)inmsg["bid"];
                if(rbs[bid])
@@ -293,7 +293,7 @@ void tls_ntls_common (
       } else if (!strcmp(sessionData["path"], "/login")) {
          //login
          ffl_notice(FPL_HTTPSERV, "Login");
-         if (!cookie["bid"] || !rbs[(ccp)cookie["bid"]]) {
+         if (!cookie["bid"] || !rbs[bid=(ccp)cookie["bid"]]) {
             mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
             goto done;
          }
@@ -309,12 +309,23 @@ void tls_ntls_common (
          if (user["password"] && !user["inactive"] &&
              !strcmp(password,user["password"])
          ) {
-            rbs[(ccp)cookie["bid"]]["user"]=username;
+            rbs[bid]["user"]=username;
+            rbs[bid]["ip"]=c->rem.ip;
             mg_http_reply(c, 200, headers, "{%Q:%s}", "login","true");
             config.save();
          } else {
             mg_http_reply(c, 200, headers, "{%Q:%s}", "login","false");
          }
+      } else if (!strcmp(sessionData["path"], "/logout")) {
+         //login
+         ffl_notice(FPL_HTTPSERV, "Logout");
+         if (!cookie["bid"] || !rbs[bid=(ccp)cookie["bid"]]) {
+            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
+            goto done;
+         }
+         rbs[bid]["user"]=NULL;
+         mg_http_reply(c, 200, headers, "{%Q:%s}", "logout","true");
+         config.save();
       } else if(!strcmp(sessionData["path"], "/signup")){
          //signup
          ffl_notice(FPL_HTTPSERV, "Signup");
