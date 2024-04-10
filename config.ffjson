@@ -14,6 +14,7 @@
 			Notices=4,
 			Debug=8
 	",
+   "#logType": "no effect as of now. should set it in global.cpp",
 	"logType": [8, 4, 2, 1],
 	
 	"#logLevel": "
@@ -44,7 +45,8 @@
 		"underconstruction": {
 			"rootdir": "/home/Necktwi/workspace/WWW-development",
          "users": file:///home/Necktwi/workspace/WWW-development/users.ffjson,
-         "rbs": file:///home/Necktwi/workspace/WWW-development/rbs.ffjson
+         "rbs": file:///home/Necktwi/workspace/WWW-development/rbs.ffjson,
+         "config": file:///home/Necktwi/workspace/WWW-development/config.ffjson
 		},
       "127.0.0.2": underconstruction,
       "192.168.0.4": underconstruction,

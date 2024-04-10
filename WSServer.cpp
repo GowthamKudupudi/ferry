@@ -34,6 +34,7 @@
 #include <vector>
 #include <iostream>
 #include <string>
+#include <filesystem>
 #include <sys/stat.h>
 
 
@@ -59,8 +60,8 @@ const char* mail_server = "tcp://ferryfair.com:25";
 const char* admin = "Necktwi";
 const char* admin_pass = "tornshoes";
 const char* to = nullptr;
-
 const char* from = "FerryFair";
+const char* plaintxtHdr = "content-type: text/plain\r\n";
 char subj[64];
 char mesg[128];
 
@@ -227,7 +228,7 @@ void tls_ntls_common (
       b[1] = (c->rem.ip >> 8) & 0xFF;
       b[2] = (c->rem.ip >> 16) & 0xFF;
       b[3] = (c->rem.ip >> 24) & 0xFF;
-      ffl_notice(FPL_HTTPSERV, "Remote IP: %d.%d.%d.%d",
+      ffl_notice(FPL_HTTPSERV, "Remote IP: %d.%d.%d.%d-------------------",
                  b[0], b[1], b[2], b[3]);
       struct mg_http_message* hm = (struct mg_http_message*) ev_data;
       ffl_notice(FPL_HTTPSERV, "hm->uri:\n%s", hm->uri.ptr);
@@ -360,6 +361,9 @@ void tls_ntls_common (
          vhost["users"][(ccp)user["email"]].addLink(
             &vhost["users"][username],username);
          user["inactive"]=true;
+         filesystem::path
+            usrpth(string(opts.root_dir)+string("/upload/")+username);
+         filesystem::create_directory(usrpth);
          string actKey = random_alphnuma_string();
          user["activationKey"]=actKey;
          ffl_notice(FPL_HTTPSERV, "actKey: %s",actKey.c_str());
@@ -377,26 +381,137 @@ void tls_ntls_common (
       } else if(strstr((ccp)sessionData["path"], "/activate?")){
          FFJSON data;
          get_data_in_url(sessionData["path"], data);
-         username=data[""];
+         username=data["user"];
          user=&vhost["users"][username];
-         headers = "content-type: text/plain\r\n";
          if (!user["password"] || !user["inactive"]) {
-            mg_http_reply(c, 200, headers, "Wrong key.");
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "wrongKey" );
          } else if (!strcmp(user["activationKey"],data["key"])) {
             user["inactive"]=false;
             user["name"]=username;
             mg_http_reply(c, 200, headers, "%s activated.", username);
             config.save();
          } else {
-            mg_http_reply(c, 200, headers, "Wrong key.");
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "wrongKey" );
          }
-      } else if(strstr((ccp)sessionData["path"], "/upload")){
+      } else if(strstr((ccp)sessionData["path"], "/upload?")){
+         if (!cookie["bid"] || !rbs[bid=(ccp)cookie["bid"]]) {
+            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
+            goto done;
+         }
+         username=(ccp)rbs[bid]["user"];
+         user=&vhost["users"][username];
+         int maxThings = (bool)user["maxThings"]?
+            user["maxThings"]:vhost["config"]["defaultMaxThings"];
+         int maxThingPics = (bool)user["maxThings"]?
+            user["maxThings"]:vhost["config"]["defaultMaxThingPics"];
          FFJSON data;
          get_data_in_url(sessionData["path"], data);
-         ffl_notice(FPL_HTTPSERV, "receiving: %s", (const char*)data["file"]);
-         string upldpth = string(opts.root_dir) + string("/tmp");
-         mg_http_upload(c, hm, &mg_fs_posix, upldpth.c_str(), 9999999);
+         int thingId = atoi((ccp)data["thingId"]);
+         int picId = atoi((ccp)data["picId"]);
+         int fofst = atoi((ccp)data["offset"]);
+         int chnkSz= atoi((ccp)data["chunkSize"]);
+         int ttlSz = atoi((ccp)data["totalSize"]);
+         int thngi = -1;
+         if (fofst!=0) {
+            FFJSON& ptgs=user["pendingThings"];
+            if(thingId!=(int)ptgs["thingId"]){
+               mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
+                             "noSuchThingId" );
+               goto done;                  
+            };
+            picId=ptgs["picId"];
+            thngi=ptgs["thngi"];
+            goto gotThingId;
+         }
+         if (thingId < 0) {
+            if (user["things"] && user["things"].size>=maxThings) {
+               ffl_notice (
+                  FPL_HTTPSERV,
+                  "user[\"things\"].size: %d", user["things"].size
+               );
+               mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
+                             "thingsAreAtMax" );
+               goto done;
+            }
+            if (user["things"]) {
+               thngi=user["things"].size;
+               thingId=(int)user["things"][thngi-1]["id"]+1;
+            } else {
+               thngi=0;
+               thingId=0;
+            }            
+         } else {
+            int tSize = user["things"].size;
+            for (int i=(thingId<tSize?thingId:tSize); i>=0; --i) {
+               if ((int)user["things"][i]["id"]==thingId) {
+                  thngi=i;
+                  break;
+               }
+            }
+            if (thngi<0) {
+               mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
+                             "noSuchThingId" );
+               goto done;
+            }
+         }
+        gotThingId:
+//         ffl_notice(FPL_HTTPSERV, "Serving: %s", opts.root_dir);
+         ffl_notice (
+            FPL_HTTPSERV,
+            "picId: %d, maxThingPics: %d, thingId: %d, thngi: %d",
+            picId, maxThingPics, thingId, thngi
+         );
+         if (picId >= maxThingPics) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
+                          "picsAreAtMax" );
+            goto done;
+         }
+         string upldpth(opts.root_dir);
+         upldpth += "/upload/";
+         upldpth += username;
+         upldpth += "/";
+         upldpth += to_string(thingId);
+         upldpth += ".";
+         upldpth += to_string(picId);
+         upldpth +=".jpg";
+         ffl_notice(FPL_HTTPSERV, "receiving: %s", upldpth.c_str());
+         if (fofst==0) {
+            try {
+               user["things"][thngi]["id"]=thingId;
+               user["things"][thngi]["pics"][picId]["partial"]
+                  = true;
+            } catch (FFJSON::Exception e) {
+               cout << e.what() << endl;
+               try {
+               user["things"]=new FFJSON(FFJSON::OBJ_TYPE::ARRAY);
+               user["things"][thngi]["id"]=thingId;
+               } catch (FFJSON::Exception e) {
+                  cout << e.what() << endl;
+                  cout << "thngi: " << thngi << endl;
+               }
+               try {
+               user["things"][thngi]["pics"]
+                  = new FFJSON(FFJSON::OBJ_TYPE::ARRAY);
+               user["things"][thngi]["pics"][picId]["partial"]
+                  = true;
+               } catch (FFJSON::Exception e) {
+                  cout << e.what() << endl;
+                  cout << "thngi: " << thngi << endl;
+                  cout << "picId: " << picId << endl;
+               }
+            }
+         }
+         mg_http_upload(c, hm, &mg_fs_posix, upldpth.c_str(), 2999999);
+         if (fofst+chnkSz>=ttlSz) {
+            user["pendingThings"]=nullptr;
+         }
       } else {
+         if(strstr((ccp)sessionData["path"], "/upload")){
+            if (!cookie["bid"] || !rbs[bid=(ccp)cookie["bid"]]) {
+               mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
+               goto done;
+            }
+         }
          mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
       }
      done: 

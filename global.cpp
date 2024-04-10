@@ -103,6 +103,6 @@ void terminate_all_paths() {
 /**
  * logging section
  */
-FF_LOG_TYPE fflAllowedType = (FF_LOG_TYPE) (FFL_ERR | FFL_NOTICE);
+FF_LOG_TYPE fflAllowedType = (FF_LOG_TYPE) (FFL_ERR | FFL_NOTICE | FFL_DEBUG);
 unsigned int fflAllowedLevel = (FPL_MAIN | FPL_WSSERV | FPL_FPORT);
 
