@@ -2147,7 +2147,8 @@ bool mg_http_match_uri(const struct mg_http_message *hm, const char *glob) {
 }
 
 long mg_http_upload(struct mg_connection *c, struct mg_http_message *hm,
-                    struct mg_fs *fs, const char *path, size_t max_size) {
+                    struct mg_fs *fs, const char *path, size_t max_size,
+                    const char* msg) {
   char buf[20] = "0";
   long res = 0, offset;
   mg_http_get_var(&hm->query, "offset", buf, sizeof(buf));
@@ -2176,7 +2177,13 @@ long mg_http_upload(struct mg_connection *c, struct mg_http_message *hm,
     } else {
       res = offset + (long) fs->wr(fd->fd, hm->body.ptr, hm->body.len);
       mg_fs_close(fd);
-      mg_http_reply(c, 200, "", "%ld", res);
+      char resstr[40];
+      if(msg)
+         sprintf(resstr, "%s,\"offset\":%ld}", msg, offset);
+      else
+         sprintf(resstr, "%ld", res);
+      printf("%s\n",resstr);
+      mg_http_reply(c, 200, "", resstr);
     }
   }
   return res;

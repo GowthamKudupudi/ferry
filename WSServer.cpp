@@ -236,7 +236,8 @@ void tls_ntls_common (
       string subdomain;
       ccp referer=nullptr;char proto[8]="https"; int protolen=5;
       ccp username = nullptr, password = nullptr;
-      ccp headers = "content-type: text/json\r\n";
+      ccp jsonHeader = "content-type: text/json\r\n";
+      ccp headers = jsonHeader;
       string bid;
       parseHTTPHeader((ccp)hm->uri.ptr, hm->uri.len, sessionData);
       if (!sessionData["Host"]) return;
@@ -395,7 +396,7 @@ void tls_ntls_common (
          }
       } else if(strstr((ccp)sessionData["path"], "/upload?")){
          if (!cookie["bid"] || !rbs[bid=(ccp)cookie["bid"]]) {
-            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
             goto done;
          }
          username=(ccp)rbs[bid]["user"];
@@ -424,7 +425,7 @@ void tls_ntls_common (
             goto gotThingId;
          }
          if (thingId < 0) {
-            if (user["things"] && user["things"].size>=maxThings) {
+            if ((bool)user["things"] && user["things"].size>=maxThings) {
                ffl_notice (
                   FPL_HTTPSERV,
                   "user[\"things\"].size: %d", user["things"].size
@@ -433,13 +434,13 @@ void tls_ntls_common (
                              "thingsAreAtMax" );
                goto done;
             }
-            if (user["things"]) {
+            if ((bool)user["things"]) {
                thngi=user["things"].size;
                thingId=(int)user["things"][thngi-1]["id"]+1;
             } else {
                thngi=0;
                thingId=0;
-            }            
+            }
          } else {
             int tSize = user["things"].size;
             for (int i=(thingId<tSize?thingId:tSize); i>=0; --i) {
@@ -477,33 +478,35 @@ void tls_ntls_common (
          ffl_notice(FPL_HTTPSERV, "receiving: %s", upldpth.c_str());
          if (fofst==0) {
             try {
-               user["things"][thngi]["id"]=thingId;
-               user["things"][thngi]["pics"][picId]["partial"]
-                  = true;
-            } catch (FFJSON::Exception e) {
+            FFJSON& uts = user["things"];
+            uts[thngi]["id"]=thingId;
+            FFJSON& ups = uts[thngi]["pics"];
+            ups[picId]["partial"] = true;
+            } catch (FFJSON::Exception e){
                cout << e.what() << endl;
+            }
+            if (fofst+chnkSz<ttlSz) {
                try {
-               user["things"]=new FFJSON(FFJSON::OBJ_TYPE::ARRAY);
-               user["things"][thngi]["id"]=thingId;
-               } catch (FFJSON::Exception e) {
+               FFJSON& ptgs=user["pendingThings"];
+               ptgs["thingId"]=thingId;
+               ptgs["picId"]=picId;
+               ptgs["thngi"]=thngi;
+               } catch (FFJSON::Exception e){
                   cout << e.what() << endl;
-                  cout << "thngi: " << thngi << endl;
-               }
-               try {
-               user["things"][thngi]["pics"]
-                  = new FFJSON(FFJSON::OBJ_TYPE::ARRAY);
-               user["things"][thngi]["pics"][picId]["partial"]
-                  = true;
-               } catch (FFJSON::Exception e) {
-                  cout << e.what() << endl;
-                  cout << "thngi: " << thngi << endl;
-                  cout << "picId: " << picId << endl;
                }
             }
          }
-         mg_http_upload(c, hm, &mg_fs_posix, upldpth.c_str(), 2999999);
+         char msg[30];
+         sprintf(msg, "{\"thingId\":%d", thingId);
+         mg_http_upload(
+            c, hm, &mg_fs_posix, upldpth.c_str(), 2999999, msg);
          if (fofst+chnkSz>=ttlSz) {
-            user["pendingThings"]=nullptr;
+            user.erase("pendingThings");
+            user["things"][thngi]["pics"][picId]["partial"] = false;
+            printf("pendingThings\n");
+            config.save();
+            printf("save\n");
+            
          }
       } else {
          if(strstr((ccp)sessionData["path"], "/upload")){
