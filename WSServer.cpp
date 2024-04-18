@@ -73,7 +73,12 @@ static void parseHTTPHeader (const char* uri, size_t len, FFJSON& sessionData) {
    unsigned int pairStartPin=i;
    while(uri[i]!='\0'){
       if(uri[i]=='\n'){
-         if(uri[i-1]=='\n' || (uri[i-1]=='\r' && uri[i-2]=='\n'))return;
+         if(uri[i-1]=='\n' || (uri[i-1]=='\r' && uri[i-2]=='\n')) {
+            if ((bool)sessionData["Content-type"] &&
+               strstr((ccp)sessionData["Content-type"],"text"))
+               sessionData["content"]=string(uri+i+1, len-i+1);
+            return;
+         };
          
          int k=i;
          if(uri[i-1]=='\r')k=i-1;
@@ -232,25 +237,22 @@ void tls_ntls_common (
                  b[0], b[1], b[2], b[3]);
       struct mg_http_message* hm = (struct mg_http_message*) ev_data;
       ffl_notice(FPL_HTTPSERV, "hm->uri:\n%s", hm->uri.ptr);
-      FFJSON sessionData, vhost, user, cookie, rbs;
+      FFJSON sessionData, cookie;
       string subdomain;
       ccp referer=nullptr;char proto[8]="https"; int protolen=5;
       ccp username = nullptr, password = nullptr;
       ccp jsonHeader = "content-type: text/json\r\n";
       ccp headers = jsonHeader;
       string bid;
-      parseHTTPHeader((ccp)hm->uri.ptr, hm->uri.len, sessionData);
+      parseHTTPHeader((ccp)hm->uri.ptr, strlen(hm->uri.ptr), sessionData);
       if (!sessionData["Host"]) return;
       subdomain=get_subdomain(sessionData["Host"]);
       ffl_notice(FPL_HTTPSERV, "subdomain: %s",subdomain.c_str());
-      if (config["virtualWebHosts"][subdomain]) {
-         vhost=&config["virtualWebHosts"][subdomain];
-         //printf("vhost: %s\n", vhost.prettyString().c_str());
-         opts.root_dir = (ccp)vhost["rootdir"];
-      } else {
-         vhost=&config;
-      }
-      rbs=&vhost["rbs"];
+      FFJSON& vhost = (bool)config["virtualWebHosts"][subdomain]?
+         config["virtualWebHosts"][subdomain]:config;
+      FFJSON& rbs=vhost["rbs"];
+      FFJSON& users=vhost["users"];
+      opts.root_dir=(ccp)vhost["rootdir"];
       if (sessionData["Cookie"])get_cookies(sessionData["Cookie"], cookie);
       if (!sessionData["Referer"]) goto nextproto;
       referer=sessionData["Referer"];
@@ -283,12 +285,16 @@ void tls_ntls_common (
             }
             rbs[bid]["ts"]=chrono::high_resolution_clock::now();
             if(rbs[bid]["user"]){
-               FFJSON up; up=&vhost["users"][(ccp)rbs[bid]["user"]];
-               mg_http_reply(c, 200, headers, "{%Q:%Q,%Q:%Q,%Q:%Q,%Q:%s}",
-                             "bid", bid.c_str(),"username",(ccp)up["name"], "email", (ccp)up["email"],  "login", "true");
+               FFJSON& user=users[(ccp)rbs[bid]["user"]];
+               user["bid"]=bid;
+               mg_http_reply(c, 200, headers, "%s",
+                             user.stringify(true).c_str());
+               users.save();
+               rbs.save();
+               goto done;
             }
             mg_http_reply(c, 200, headers, "{%Q:%Q}", "bid", bid.c_str());
-            config.save();
+            rbs.save();
          } else {
             mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
          }
@@ -302,19 +308,22 @@ void tls_ntls_common (
          FFJSON body(string(hm->body.ptr, hm->body.len));
          username=body["username"];password=body["password"];
          ffl_notice(FPL_HTTPSERV, "\nUser: %s\nPass: %s", username, password);
-         if (!vhost["users"][username]) {
+         if (!users[username]) {
             mg_http_reply(c, 200, headers, "{%Q:%s}", "login","false");
             goto done;
          }
-         user=&vhost["users"][username];
+         FFJSON& user=vhost["users"][username];
          cout << "password:" << (ccp)user["password"] << endl;
          if (user["password"] && !user["inactive"] &&
              !strcmp(password,user["password"])
          ) {
             rbs[bid]["user"]=username;
             rbs[bid]["ip"]=c->rem.ip;
-            mg_http_reply(c, 200, headers, "{%Q:%s}", "login","true");
-            config.save();
+            user["bid"]=bid;
+            mg_http_reply(c, 200, headers, "%s",
+                          user.stringify(true).c_str());
+            rbs.save();
+            users.save();
          } else {
             mg_http_reply(c, 200, headers, "{%Q:%s}", "login","false");
          }
@@ -327,7 +336,7 @@ void tls_ntls_common (
          }
          rbs[bid]["user"]=NULL;
          mg_http_reply(c, 200, headers, "{%Q:%s}", "logout","true");
-         config.save();
+         rbs.save();
       } else if(!strcmp(sessionData["path"], "/signup")){
          //signup
          ffl_notice(FPL_HTTPSERV, "Signup");
@@ -339,7 +348,7 @@ void tls_ntls_common (
          username=body["username"];password=body["password"];
          ffl_debug(FPL_HTTPSERV, "User: %s\nPass: %s\nEmail: %s",
                    username, password, (ccp)body["email"]);
-         user=&vhost["users"][username];
+         FFJSON& user=vhost["users"][username];
          if (user && !user["inactive"]) {
             ffl_warn(FPL_HTTPSERV, "User already exists.");
             mg_http_reply(c, 200, headers, "{%Q:%d}", "actEmailSent", 0);
@@ -350,8 +359,7 @@ void tls_ntls_common (
             goto done;
          } else if (
             user["password"] &&
-            vhost["users"][(ccp)body["email"]].val.fptr!=
-            &vhost["users"][username]
+            users[(ccp)body["email"]].val.fptr!=&users[username]
          ) {
             ffl_warn(FPL_HTTPSERV, "Email already registered.");
             mg_http_reply(c, 200, headers, "{%Q:%d}", "actEmailSent", 0);
@@ -359,8 +367,7 @@ void tls_ntls_common (
          }
          user["password"] = password;
          user["email"] = body["email"];
-         vhost["users"][(ccp)user["email"]].addLink(
-            &vhost["users"][username],username);
+         users[(ccp)user["email"]].addLink(&users[username],username);
          user["inactive"]=true;
          filesystem::path
             usrpth(string(opts.root_dir)+string("/upload/")+username);
@@ -370,37 +377,70 @@ void tls_ntls_common (
          ffl_notice(FPL_HTTPSERV, "actKey: %s",actKey.c_str());
          to=user["email"];
          sprintf(subj, "User activation link");
-         sprintf(mesg, "Open %s://%s/activate?user=%s&key=%s to activate %s",
-                 proto, (ccp)sessionData["Host"], username,
+         sprintf(mesg, "Open %s://%s/activate?user=%s&key=%s to activate "
+                 "%s", proto, (ccp)sessionData["Host"], username,
                  (ccp)user["activationKey"], username);
          mg_connect(&mail_mgr, mail_server, mailfn, NULL);
          while(!s_quit)
             mg_mgr_poll(&mail_mgr, 100);
          s_quit=false;
          mg_http_reply(c, 200, headers, "{%Q:%d}", "actEmailSent", 2);
-         config.save();
+         rbs.save();
+         users.save();
       } else if(strstr((ccp)sessionData["path"], "/activate?")){
          FFJSON data;
          get_data_in_url(sessionData["path"], data);
          username=data["user"];
-         user=&vhost["users"][username];
+         FFJSON& user=users[username];
          if (!user["password"] || !user["inactive"]) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "wrongKey" );
          } else if (!strcmp(user["activationKey"],data["key"])) {
             user["inactive"]=false;
             user["name"]=username;
             mg_http_reply(c, 200, headers, "%s activated.", username);
-            config.save();
+            users.save();
          } else {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "wrongKey" );
          }
-      } else if(strstr((ccp)sessionData["path"], "/upload?")){
+      } else if (strstr((ccp)sessionData["path"], "/update")) {
          if (!cookie["bid"] || !rbs[bid=(ccp)cookie["bid"]]) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
             goto done;
          }
          username=(ccp)rbs[bid]["user"];
-         user=&vhost["users"][username];
+         FFJSON cntnt((ccp)sessionData["content"]);
+         FFJSON& user=vhost["users"][username];
+         if (cntnt["things"]){
+            FFJSON& things = cntnt["things"];
+            FFJSON& uthings = user["things"];
+            if(!(bool)uthings){
+               uthings.init("[]");
+            }
+            for (int i=0; i<things.size; ++i) {
+               if (!(bool)things[i])
+                  continue;
+               if (i>user["things"].size) {
+                  mg_http_reply(c, 200, headers, "{%Q:%Q}",
+                                "update", "sizeExceeded");
+                  goto done;
+               }
+               if (!(bool)uthings[i]) {
+                  uthings[i]["id"]=uthings.size?
+                     ((int)uthings[i-1]["id"])+1:0;
+               }
+               user["things"][i]=things[i];
+            }
+         }
+         mg_http_reply(c, 200, headers, "%s", user.stringify(true).c_str());
+         users.save();
+      } else if (strstr((ccp)sessionData["path"], "/upload?")){
+         //upload?
+         if (!cookie["bid"] || !rbs[bid=(ccp)cookie["bid"]]) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
+            goto done;
+         }
+         username=(ccp)rbs[bid]["user"];
+         FFJSON& user=users[username];
          int maxThings = (bool)user["maxThings"]?
             user["maxThings"]:vhost["config"]["defaultMaxThings"];
          int maxThingPics = (bool)user["maxThings"]?
@@ -434,7 +474,7 @@ void tls_ntls_common (
                              "thingsAreAtMax" );
                goto done;
             }
-            if ((bool)user["things"]) {
+            if ((bool)user["things"] && user["things"].size) {
                thngi=user["things"].size;
                thingId=(int)user["things"][thngi-1]["id"]+1;
             } else {
@@ -477,36 +517,31 @@ void tls_ntls_common (
          upldpth +=".jpg";
          ffl_notice(FPL_HTTPSERV, "receiving: %s", upldpth.c_str());
          if (fofst==0) {
-            try {
             FFJSON& uts = user["things"];
             uts[thngi]["id"]=thingId;
             FFJSON& ups = uts[thngi]["pics"];
             ups[picId]["partial"] = true;
-            } catch (FFJSON::Exception e){
-               cout << e.what() << endl;
-            }
             if (fofst+chnkSz<ttlSz) {
-               try {
                FFJSON& ptgs=user["pendingThings"];
                ptgs["thingId"]=thingId;
                ptgs["picId"]=picId;
                ptgs["thngi"]=thngi;
-               } catch (FFJSON::Exception e){
-                  cout << e.what() << endl;
-               }
             }
          }
          char msg[30];
          sprintf(msg, "{\"thingId\":%d", thingId);
          mg_http_upload(
             c, hm, &mg_fs_posix, upldpth.c_str(), 2999999, msg);
-         if (fofst+chnkSz>=ttlSz) {
+         if (fofst == ttlSz) {
             user.erase("pendingThings");
             user["things"][thngi]["pics"][picId]["partial"] = false;
             printf("pendingThings\n");
-            config.save();
+            users.save();
             printf("save\n");
             
+         }
+         if (fofst==2103296) {
+            printf("its gonna segfault\n");
          }
       } else {
          if(strstr((ccp)sessionData["path"], "/upload")){
