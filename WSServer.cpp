@@ -252,7 +252,8 @@ void tls_ntls_common (
          config["virtualWebHosts"][subdomain]:config;
       FFJSON& rbs=vhost["rbs"];
       FFJSON& users=vhost["users"];
-      opts.root_dir=(ccp)vhost["rootdir"];
+      if (vhost["rootdir"])
+         opts.root_dir=(ccp)vhost["rootdir"];
       if (sessionData["Cookie"])get_cookies(sessionData["Cookie"], cookie);
       if (!sessionData["Referer"]) goto nextproto;
       referer=sessionData["Referer"];
