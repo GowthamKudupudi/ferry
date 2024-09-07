@@ -338,7 +338,7 @@ void tls_ntls_common (
          rbs[bid]["user"]=NULL;
          mg_http_reply(c, 200, headers, "{%Q:%s}", "logout","true");
          rbs.save();
-      } else if(!strcmp(sessionData["path"], "/signup")){
+      } else if (!strcmp(sessionData["path"], "/signup")) {
          //signup
          ffl_notice(FPL_HTTPSERV, "Signup");
          if (!cookie["bid"] || !rbs[(ccp)cookie["bid"]]) {
@@ -530,7 +530,7 @@ void tls_ntls_common (
             }
          }
          char msg[30];
-         sprintf(msg, "{\"thingId\":%d", thingId);
+         sprintf(msg, "{\"thingId\":%d,\"picId\":%d,", thingId,picId);
          mg_http_upload(
             c, hm, &mg_fs_posix, upldpth.c_str(), 2999999, msg);
          if (fofst == ttlSz) {
