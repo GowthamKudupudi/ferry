@@ -1463,7 +1463,7 @@ struct mip_if {
 #define MIP_STATE_DOWN 0          // Interface is down
 #define MIP_STATE_UP 1            // Interface is up
 #define MIP_STATE_READY 2         // Interface is up and has IP
-  struct queue queue;             // Receive queue
+  struct ::queue queue;           // Receive queue
 };
 
 void mip_init(struct mg_mgr *, struct mip_if *);

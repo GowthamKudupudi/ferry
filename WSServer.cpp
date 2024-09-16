@@ -67,11 +67,12 @@ char mesg[128];
 bool s_quit = false;
 bool sendMail = false;
 
-static void parseHTTPHeader (const char* uri, size_t len, FFJSON& sessionData) {
+static void parseHTTPHeader (const char* uri, size_t len,
+                             FFJSON& sessionData) {
    unsigned int i=0;
    unsigned int pairStartPin=i;
-   while(uri[i]!='\0'){
-      if(uri[i]=='\n'){
+   while(uri[i]!='\0') {
+      if(uri[i]=='\n') {
          if(uri[i-1]=='\n' || (uri[i-1]=='\r' && uri[i-2]=='\n')) {
             if ((bool)sessionData["content-type"] &&
                strstr((ccp)sessionData["content-type"],"text")) {
@@ -81,29 +82,30 @@ static void parseHTTPHeader (const char* uri, size_t len, FFJSON& sessionData) {
          };
          
          int k=i;
-         if(uri[i-1]=='\r')k=i-1;
-         if(pairStartPin==0){
+         if (uri[i-1]=='\r') k=i-1;
+         if (pairStartPin==0) {
             int j=pairStartPin;
-            while(uri[j]!=' ' && j<k){
+            while (uri[j]!=' ' && j<k) {
                ++j;
             }
-            if(j==k) goto line_done;
+            if (j==k) goto line_done;
             sessionData["path"]=string(uri,j);
             ++j;
             sessionData["version"]=string(uri+j,k-j);            
-         }else{
+         } else {
             int j=pairStartPin;
-            while(uri[pairStartPin]==' ')++pairStartPin;
-            while(uri[j]!=':' && j<k)++j;
-            if(j==k) goto line_done;
-            int keySize=j-pairStartPin;
+            while (uri[pairStartPin]==' ') ++pairStartPin;
+            while (uri[j]!=':' && j<k) ++j;
+            if (j==k) goto line_done;
+            int keySize = j-pairStartPin;
             ++j;
             ++j;
             string keyStr(uri+pairStartPin,keySize);
             strLower(keyStr);
-            sessionData[keyStr]=string(uri+j,k-j);
+            sessionData[keyStr] = string(uri+j,k-j);
+            printf("%s: %.*s\n", keyStr.c_str(), k-j, uri+j);
          }
-line_done:         
+line_done:
          pairStartPin=i+1;
       }
       ++i;
@@ -238,7 +240,7 @@ void tls_ntls_common (
       ffl_notice(FPL_HTTPSERV, "Remote IP: %d.%d.%d.%d-------------------",
                  b[0], b[1], b[2], b[3]);
       struct mg_http_message* hm = (struct mg_http_message*) ev_data;
-      ffl_notice(FPL_HTTPSERV, "hm->uri:\n%s", hm->uri.ptr);
+      //ffl_notice(FPL_HTTPSERV, "hm->uri:\n%s", hm->uri.ptr);
       FFJSON sessionData, cookie;
       string subdomain;
       ccp referer=nullptr;char proto[8]="https"; int protolen=5;
@@ -308,7 +310,7 @@ void tls_ntls_common (
       } else if (!strcmp(sessionData["path"], "/login")) {
          //login
          ffl_notice(FPL_HTTPSERV, "Login");
-         if (!cookie["bid"] || !rbs[bid]) {
+         if (!bid.length() || !rbs[bid]) {
             mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
             goto done;
          }
@@ -362,7 +364,7 @@ void tls_ntls_common (
          //signup
          bool recovery=false;
          ffl_notice(FPL_HTTPSERV, "Signup");
-         if (!bid.length() || !rbs[(ccp)cookie["bid"]]) {
+         if (!bid.length() || !rbs[bid]) {
             mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
             goto done;
          }
@@ -415,7 +417,7 @@ void tls_ntls_common (
                           "Email already registered! Try resetting password");
             goto done;
          } else if (!recovery &&
-                    !(validUsername(string(username)) && strlen(username)>32)
+                    !(validUsername(string(username)) && strlen(username)<=32)
          ) {
             ffl_warn(FPL_HTTPSERV, "Invalid password");
             mg_http_reply(c, 200, headers, "{%Q:%d,%Q:%Q}", "actEmailSent",
