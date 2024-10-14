@@ -91,7 +91,7 @@ static void parseHTTPHeader (const char* uri, size_t len,
             if (j==k) goto line_done;
             sessionData["path"]=string(uri,j);
             ++j;
-            sessionData["version"]=string(uri+j,k-j);            
+            sessionData["version"]=string(uri+j,k-j);
          } else {
             int j=pairStartPin;
             while (uri[pairStartPin]==' ') ++pairStartPin;
@@ -504,7 +504,7 @@ void tls_ntls_common (
          }
          FFJSON cntnt((ccp)sessionData["content"]);
          FFJSON& user=vhost["users"][username];
-         if (cntnt["things"]){
+         if (cntnt["things"]) {
             FFJSON& things = cntnt["things"];
             FFJSON& uthings = user["things"];
             if(!(bool)uthings){
