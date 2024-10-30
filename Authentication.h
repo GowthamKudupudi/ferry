@@ -14,6 +14,7 @@
 class Authentication_ {
 public:
    Authentication_ (const std::string& Username, const std::string& Password);
+   ~Authentication_ ();
    bool is_valid ();
    void invalidate ();
    
@@ -34,6 +35,7 @@ private:
    struct pam_response* _RespPtr =        NULL;
    int                  _State =          0;
    pam_handle_t*        _AuthHandlePtr =  NULL;
+
    
 };
 

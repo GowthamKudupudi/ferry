@@ -28,6 +28,12 @@ Username (Username), Password (Password)
    _State = pam_authenticate (_AuthHandlePtr, 0);
 }
 
+Authentication_::~Authentication_ () {
+   pam_end(_AuthHandlePtr, _State);
+   delete _RespPtr;
+   delete _AuthHandlePtr;
+}
+
 int Authentication_::_converse (
    int MsgNum, const struct pam_message** MsgPPtr,
    struct pam_response** RespPPtr, void* DataPtr

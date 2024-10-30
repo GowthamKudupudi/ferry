@@ -28,6 +28,7 @@ int stderrfd = -1;
 int stdoutfd = -1;
 int init_path_id = 0;
 bool valgrind_test = false;
+int valgrind_count = 30;
 
 std::mutex ipMutex;
 

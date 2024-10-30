@@ -14,7 +14,7 @@
 			Notices=4,
 			Debug=8
 	",
-   "#logType": "no effect as of now. should set it in global.cpp",
+   "#logType2": "no effect as of now. should set it in global.cpp",
 	"logType": [8, 4, 2, 1],
 	
 	"#logLevel": "

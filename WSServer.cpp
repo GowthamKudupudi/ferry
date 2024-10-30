@@ -274,21 +274,21 @@ void tls_ntls_common (
           //cookie
          ffl_notice(FPL_HTTPSERV, "cookie");
          FFJSON inmsg(string(hm->body.ptr, hm->body.len));
-         if (inmsg["bid"]){
-            if(strcmp(inmsg["bid"],"undefined")){
+         if (inmsg["bid"]) {
+            if (strcmp(inmsg["bid"],"undefined")) {
                bid=(ccp)inmsg["bid"];
                if(rbs[bid])
                   goto gotbid;
             }
             bid = random_alphnuma_string();
            bidcheck:
-            if(rbs[bid]){
+            if (rbs[bid]) {
                bid=random_alphnuma_string();
                goto bidcheck;
             }
             rbs[bid]["ip"]=c->rem.ip;
            gotbid:
-            if((uint32_t)rbs[bid]["ip"]!=c->rem.ip){
+            if ((uint32_t)rbs[bid]["ip"]!=c->rem.ip) {
                mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "ipChanged");
                goto done;
             }
@@ -522,7 +522,7 @@ void tls_ntls_common (
                   uthings[i]["id"]=uthings.size?
                      ((int)uthings[i-1]["id"])+1:0;
                }
-               user["things"][i]=things[i];
+               uthings[i]=things[i];
             }
          }
          mg_http_reply(c, 200, headers, "%s", user.stringify(true).c_str());
@@ -644,7 +644,7 @@ void tls_ntls_common (
          mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
       }
      done: 
-      if (valgrind_test)
+      if (valgrind_test && !--valgrind_count)
          force_exit=true;
    }
 }
