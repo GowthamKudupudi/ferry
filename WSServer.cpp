@@ -243,10 +243,10 @@ void tls_ntls_common (
       //ffl_notice(FPL_HTTPSERV, "hm->uri:\n%s", hm->uri.ptr);
       FFJSON sessionData, cookie;
       string subdomain;
-      ccp referer=nullptr;char proto[8]="https"; int protolen=5;
+      ccp referer=nullptr;char proto[8]="https"; int protolen;
       ccp username = nullptr, password = nullptr;
       ccp jsonHeader = "content-type: text/json\r\n";
-      ccp headers = jsonHeader;
+      ccp headers = jsonHeader, path;
       string bid;
       parseHTTPHeader((ccp)hm->uri.ptr, strlen(hm->uri.ptr), sessionData);
       if (!sessionData["host"]) return;
@@ -266,10 +266,16 @@ void tls_ntls_common (
       if (!sessionData["referer"]) goto nextproto;
       referer=sessionData["referer"];
       protolen = strstr(referer,":") - referer;
+      if (protolen<0) {
+         ffl_debug(FPL_HTTPSERV, "noproto");
+         mg_http_reply(c, 200, headers, "noproto");
+         goto done;
+      }
       sprintf(proto,"%.*s",protolen,(ccp)sessionData["referer"]);
      nextproto:
       ffl_debug(FPL_HTTPSERV, "proto: %s",proto);
       ffl_notice(FPL_HTTPSERV, "Serving: %s", opts.root_dir);
+      path = sessionData["path"];
       if (!strcmp(sessionData["path"], "/cookie")) {
           //cookie
          ffl_notice(FPL_HTTPSERV, "cookie");
@@ -447,7 +453,7 @@ void tls_ntls_common (
          if (!recovery) {
          user["email"] = body["email"];
          user["password"] = password;
-         users[(ccp)user["email"]].addLink(&users[username],username);
+         users[(ccp)user["email"]].addLink(users,username);
          user["inactive"]=true;
          filesystem::path
             usrpth(string(opts.root_dir)+string("/upload/")+username);
@@ -492,6 +498,14 @@ void tls_ntls_common (
          } else {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "wrongKey" );
          }
+      } else if (strstr((ccp)sessionData["path"], "/search")) {
+         if (!sessionData["content"]) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "No Content!");
+            goto done;
+         }
+         FFJSON cntnt((ccp)sessionData["content"]);
+         ffl_notice(FPL_HTTPSERV, "cntnt: %s", (ccp)cntnt);
+         mg_http_reply(c, 200, headers, "done");
       } else if (strstr((ccp)sessionData["path"], "/update")) {
          if (!bid.length() || !rbs[bid]) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
@@ -503,31 +517,39 @@ void tls_ntls_common (
             goto done;
          }
          FFJSON cntnt((ccp)sessionData["content"]);
-         FFJSON& user=vhost["users"][username];
+         FFJSON& theThings = vhost["things"];
+         FFJSON& user = vhost["users"][username];
          if (cntnt["things"]) {
             FFJSON& things = cntnt["things"];
-            FFJSON& uthings = user["things"];
-            if(!(bool)uthings){
+            FFJSON& uthings = vhost["users"][username]["things"];
+            if(!(bool)uthings) {
                uthings.init("[]");
             }
             for (int i=0; i<things.size; ++i) {
                if (!(bool)things[i])
                   continue;
-               if (i>user["things"].size) {
+               if (i>uthings.size) {
                   mg_http_reply(c, 200, headers, "{%Q:%Q}",
                                 "update", "sizeExceeded");
                   goto done;
                }
                if (!(bool)uthings[i]) {
-                  uthings[i]["id"]=uthings.size?
-                     ((int)uthings[i-1]["id"])+1:0;
+                  uthings[i]["id"] = uthings.size?
+                     ((int)uthings[i-1]["id"]) + 1 : 0;
+               }
+               if (strcmp(things[i]["name"], uthings[i]["name"])) {
+                  theThings[(ccp)uthings[i]["name"]].erase(&uthings[i]);
                }
                uthings[i]=things[i];
+               FFJSON& ln = theThings[(ccp)things[i]["name"]][].addLink(
+                  vhost, string("users.")+username+".things."+to_string(i));
+               if (!ln)
+                  delete &ln;
             }
          }
          mg_http_reply(c, 200, headers, "%s", user.stringify(true).c_str());
-         users.save();
-      } else if (strstr((ccp)sessionData["path"], "/upload?")){
+         vhost.save();
+      } else if (strstr((ccp)sessionData["path"], "/upload?")) {
          //upload?
          if (!bid.length() || !rbs[bid]) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");

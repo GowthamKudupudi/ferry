@@ -446,8 +446,7 @@ int main (int argc, char** argv) {
             dup2(ferr, 2);
             stderrfd = ferr;
             firstFork();
-         }
-         else if (opt.compare("normal") == 0) {
+         } else if (opt.compare("normal") == 0) {
             run();
          }
          break;
