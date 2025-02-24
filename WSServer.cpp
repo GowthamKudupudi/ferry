@@ -67,6 +67,8 @@ char mesg[128];
 bool s_quit = false;
 bool sendMail = false;
 
+const uint thnsPrSrch = 25;
+
 static void parseHTTPHeader (const char* uri, size_t len,
                              FFJSON& sessionData) {
    unsigned int i=0;
@@ -256,6 +258,7 @@ void tls_ntls_common (
          config["virtualWebHosts"][subdomain]:config;
       FFJSON& rbs=vhost["rbs"];
       FFJSON& users=vhost["users"];
+      FFJSON& things=vhost["things"];
       if (vhost["rootdir"])
          opts.root_dir=(ccp)vhost["rootdir"];
       if (sessionData["cookie"])get_cookies(sessionData["cookie"], cookie);
@@ -265,23 +268,25 @@ void tls_ntls_common (
       }
       if (!sessionData["referer"]) goto nextproto;
       referer=sessionData["referer"];
-      protolen = strstr(referer,":") - referer;
-      if (protolen<0) {
+      username = strstr(referer,":");
+      protolen = username - referer;
+      if (username==nullptr || protolen<0) {
          ffl_debug(FPL_HTTPSERV, "noproto");
          mg_http_reply(c, 200, headers, "noproto");
          goto done;
       }
       sprintf(proto,"%.*s",protolen,(ccp)sessionData["referer"]);
      nextproto:
+      username=nullptr;
       ffl_debug(FPL_HTTPSERV, "proto: %s",proto);
       ffl_notice(FPL_HTTPSERV, "Serving: %s", opts.root_dir);
       path = sessionData["path"];
-      if (!strcmp(sessionData["path"], "/cookie")) {
-          //cookie
+      if (!strcmp(path, "/cookie")) {
+         //cookie
          ffl_notice(FPL_HTTPSERV, "cookie");
          FFJSON inmsg(string(hm->body.ptr, hm->body.len));
-         if (inmsg["bid"]) {
-            if (strcmp(inmsg["bid"],"undefined")) {
+         if (!inmsg["bid"].isType(FFJSON::UNDEFINED)) {
+            if (strcmp(inmsg["bid"],"undefined") || inmsg["bid"]) {
                bid=(ccp)inmsg["bid"];
                if(rbs[bid])
                   goto gotbid;
@@ -295,25 +300,42 @@ void tls_ntls_common (
             rbs[bid]["ip"]=c->rem.ip;
            gotbid:
             if ((uint32_t)rbs[bid]["ip"]!=c->rem.ip) {
-               mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "ipChanged");
+               mg_http_reply(c, 200, headers, "{%Q:%Q}", "error",
+                             "ipChanged");
                goto done;
             }
             rbs[bid]["ts"]=chrono::high_resolution_clock::now();
-            if (rbs[bid]["user"]) {
-               FFJSON& user=users[(ccp)rbs[bid]["user"]];
-               user["bid"]=bid;
-               mg_http_reply(c, 200, headers, "%s",
-                             user.stringify(true).c_str());
-               users.save();
-               rbs.save();
-               goto done;
+            FFJSON reply;
+            username = rbs[bid]["user"];
+            if (username) {
+               reply = users[(ccp)rbs[bid]["user"]];
             }
-            mg_http_reply(c, 200, headers, "{%Q:%Q}", "bid", bid.c_str());
+            reply["bid"]=bid;
+            int k=reply["things"].size;
+            FFJSON::Iterator tit = things.begin();
+            FFJSON::Iterator atit;
+            while (tit != things.end()) {
+               atit = tit->begin();
+               while (atit != tit->end()) {
+                  FFJSON::FeaturedMember fm =
+                     atit->getFeaturedMember(FFJSON::FM_LINK);
+                  if (!username || strcmp((*fm.link)[1].c_str(),username)) {
+                     (reply["things"][k]=*atit).
+                        setEFlag(FFJSON::LONG_LAST_LN);
+                     ++k;
+                  }
+                  ++atit;
+               }
+               ++tit;
+            }
+               
+            mg_http_reply(c, 200, headers, "%s",
+                          reply.stringify(true).c_str());
             rbs.save();
          } else {
             mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
          }
-      } else if (!strcmp(sessionData["path"], "/login")) {
+      } else if (!strcmp(path, "/login")) {
          //login
          ffl_notice(FPL_HTTPSERV, "Login");
          if (!bid.length() || !rbs[bid]) {
@@ -327,7 +349,7 @@ void tls_ntls_common (
             mg_http_reply(c, 200, headers, "{%Q:%s}", "login","false");
             goto done;
          }
-         FFJSON& user=vhost["users"][username];
+         FFJSON& user=users[username];
          cout << "password:" << (ccp)user["password"] << endl;
          if (user["password"] && !user["inactive"] &&
              !strcmp(password,user["password"])
@@ -342,7 +364,7 @@ void tls_ntls_common (
          } else {
             mg_http_reply(c, 200, headers, "{%Q:%s}", "login","false");
          }
-      } else if (!strcmp(sessionData["path"], "/logout")) {
+      } else if (!strcmp(path, "/logout")) {
          //login
          ffl_notice(FPL_HTTPSERV, "Logout");
          if (!bid.length() || !rbs[bid]) {
@@ -352,7 +374,7 @@ void tls_ntls_common (
          rbs[bid]["user"]=NULL;
          mg_http_reply(c, 200, headers, "{%Q:%s}", "logout","true");
          rbs.save();
-      } else if (!strcmp(sessionData["path"], "/captcha")) {
+      } else if (!strcmp(path, "/captcha")) {
          //login
          ffl_notice(FPL_HTTPSERV, "captcha");
          if (!bid.length() || !rbs[bid]) {
@@ -366,7 +388,7 @@ void tls_ntls_common (
          randcap.save();
          mg_http_reply(c, 200, headers, "{%Q:%s}", "cap","true");
          rbs.save();
-      } else if (!strcmp(sessionData["path"], "/signup")) {
+      } else if (!strcmp(path, "/signup")) {
          //signup
          bool recovery=false;
          ffl_notice(FPL_HTTPSERV, "Signup");
@@ -381,7 +403,7 @@ void tls_ntls_common (
                       username, password, (ccp)body["email"]);
          } else if (body["email"]) {
             recovery=true;
-            std::map<string,FFJSON*>* emln = vhost["users"].val.pairs;
+            std::map<string,FFJSON*>* emln = users.val.pairs;
             if (emln->find(string((ccp)body["email"]))!=emln->end()) {
                FFJSON* ffemln = (*emln)[string((ccp)body["email"])];
                FFJSON::Link* link =
@@ -398,7 +420,7 @@ void tls_ntls_common (
             }
          }
          password=body["password"];
-         FFJSON& user=vhost["users"][username];
+         FFJSON& user=users[username];
          if (!recovery && user &&
              (user["activationKey"] && !user["inactive"])) {
             ffl_warn(FPL_HTTPSERV, "User already exists.");
@@ -477,9 +499,9 @@ void tls_ntls_common (
                        "msg", "Activation mail sent to ur email :D");
          rbs.save();
          users.save();
-      } else if(strstr((ccp)sessionData["path"], "/activate?")){
+      } else if (strstr(path, "/activate?")) {
          FFJSON data;
-         get_data_in_url(sessionData["path"], data);
+         get_data_in_url(path, data);
          username=data["user"];
          FFJSON& user=users[username];
          if ((!user["password"] || !user["inactive"]) &&
@@ -498,15 +520,41 @@ void tls_ntls_common (
          } else {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "wrongKey" );
          }
-      } else if (strstr((ccp)sessionData["path"], "/search")) {
-         if (!sessionData["content"]) {
-            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "No Content!");
+      } else if (strstr(path, "/search")) {
+         if (!bid.length() || !rbs[bid]) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
             goto done;
          }
-         FFJSON cntnt((ccp)sessionData["content"]);
-         ffl_notice(FPL_HTTPSERV, "cntnt: %s", (ccp)cntnt);
-         mg_http_reply(c, 200, headers, "done");
-      } else if (strstr((ccp)sessionData["path"], "/update")) {
+         FFJSON body(string(hm->body.ptr, hm->body.len));
+         if (!body["search"]) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nosearch");
+            goto done;
+         }
+         ccp srchStr = body["search"];
+         FFJSON::Iterator tit = things.find(string(srchStr)+'*');
+         FFJSON::Iterator atit;
+         FFJSON reply;
+         int k=0;
+         while (tit != things.end()) {
+            atit = tit->begin();
+            while (atit != tit->end()) {
+               FFJSON::FeaturedMember fm =
+                  atit->getFeaturedMember(FFJSON::FM_LINK);
+               if (!username || strcmp((*fm.link)[1].c_str(),username)) {
+                  (reply["things"][k]=*atit).
+                     setEFlag(FFJSON::LONG_LAST_LN);
+                  ++k;
+               }
+               ++atit;
+            }
+            ++tit;
+            if (!strstr(tit.getIndex().c_str(), srchStr)) {
+               break;
+            }
+         }
+         mg_http_reply(c, 200, headers, "%s",
+                       reply.stringify(true).c_str());         
+      } else if (strstr(path, "/update")) {
          if (!bid.length() || !rbs[bid]) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
             goto done;
@@ -517,31 +565,43 @@ void tls_ntls_common (
             goto done;
          }
          FFJSON cntnt((ccp)sessionData["content"]);
-         FFJSON& theThings = vhost["things"];
-         FFJSON& user = vhost["users"][username];
+         FFJSON& user = users[username];
          if (cntnt["things"]) {
-            FFJSON& things = cntnt["things"];
-            FFJSON& uthings = vhost["users"][username]["things"];
-            if(!(bool)uthings) {
+            FFJSON& cthings = cntnt["things"];
+            FFJSON& uthings = user["things"];
+            bool newthing=false;
+            int id = 0;
+            if (!(bool)uthings) {
                uthings.init("[]");
             }
-            for (int i=0; i<things.size; ++i) {
-               if (!(bool)things[i])
+            for (int i=0; i<cthings.size; ++i) {
+               if (!cthings[i])
                   continue;
                if (i>uthings.size) {
                   mg_http_reply(c, 200, headers, "{%Q:%Q}",
                                 "update", "sizeExceeded");
                   goto done;
                }
-               if (!(bool)uthings[i]) {
-                  uthings[i]["id"] = uthings.size?
+               if (!uthings[i]) {
+                  cthings[i]["id"] = uthings.size?
                      ((int)uthings[i-1]["id"]) + 1 : 0;
+                  FFJSON& ln = uthings[i]["user"].addLink(users, username);
+                  if (!ln)
+                     delete &ln;
+               } else if (strcasecmp(cthings[i]["name"], uthings[i]["name"])) {
+                  things[(ccp)uthings[i]["name"]].erase(&uthings[i]);
                }
-               if (strcmp(things[i]["name"], uthings[i]["name"])) {
-                  theThings[(ccp)uthings[i]["name"]].erase(&uthings[i]);
+               id=cthings[i]["id"];
+               for (int j=0;j<uthings.size;++j) {
+                  if (id==(int)uthings[j]["id"]) {
+                     id=j;
+                     break;
+                  }
                }
-               uthings[i]=things[i];
-               FFJSON& ln = theThings[(ccp)things[i]["name"]][].addLink(
+               uthings[id]=cthings[i];
+               string tname((ccp)uthings[id]["name"]);
+               strLower(tname);
+               FFJSON& ln = things[tname][].addLink(
                   vhost, string("users.")+username+".things."+to_string(i));
                if (!ln)
                   delete &ln;
@@ -549,7 +609,7 @@ void tls_ntls_common (
          }
          mg_http_reply(c, 200, headers, "%s", user.stringify(true).c_str());
          vhost.save();
-      } else if (strstr((ccp)sessionData["path"], "/upload?")) {
+      } else if (strstr(path, "/upload?")) {
          //upload?
          if (!bid.length() || !rbs[bid]) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
@@ -562,7 +622,7 @@ void tls_ntls_common (
          int maxThingPics = (bool)user["maxThings"]?
             user["maxThings"]:vhost["config"]["defaultMaxThingPics"];
          FFJSON data;
-         get_data_in_url(sessionData["path"], data);
+         get_data_in_url(path, data);
          int thingId = atoi((ccp)data["thingId"]);
          int picId = atoi((ccp)data["picId"]);
          int fofst = atoi((ccp)data["offset"]);
@@ -650,13 +710,13 @@ void tls_ntls_common (
             c, hm, &mg_fs_posix, upldpth.c_str(), 2999999, msg);
          if (fofst+chnkSz >= ttlSz) {
             user.erase("pendingThings");
-            user["things"][thngi]["pics"][picId]["partial"] = false;
+            user["things"][thngi]["pics"][picId].erase("partial");
             printf("pendingThings\n");
             users.save();
          }
       } else {
-         if (strstr((ccp)sessionData["path"], "/upload") ||
-            strstr((ccp)sessionData["path"], "/tmp")
+         if (strstr(path, "/upload") || //restricted directories
+            strstr(path, "/tmp")
          ) {
             if (!bid.length() || !rbs[bid]) {
                mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
@@ -692,6 +752,83 @@ void fn_tls (
    tls_ntls_common(c, ev, ev_data, fn_data);
 }
 
+double eastWall,westWall,northWall,southWall;
+QuadTree* QuadHldr::insert(FFJSON& rF, unsigned int level, double x, double y) {
+   if (fp==nullptr) {
+      fp=&rF;
+   } else if (malloc_usable_size(fp)==24) {
+      FFJSON& tmp = *fp;
+      qp = new QuadTree();
+      if ((double)tmp["location"][0] >= x) {
+         if ((double)tmp["location"][1] >= y) {
+            qp->qh1.fp=&tmp;
+         } else {
+            qp->qh2.fp=&tmp;
+         }
+      } else {
+         if ((double)tmp["location"][1] >= y) {
+            qp->qh3.fp=&tmp;
+         } else {
+            qp->qh4.fp=&tmp;
+         }
+      }
+      insert(rF,level,x,y);
+   } else {
+      if ((double)rF["location"][0] >= x) {
+         if ((double)rF["location"][1] >= y) {
+            if (qp->qh1.fp==nullptr) {
+               qp->qh1.fp=&rF;
+            } else {
+               qp->qh1.insert(rF, level+1,
+                              x+180/(2*(level+1)),
+                              y+90/(2*(level+1)));
+            }
+         } else {
+            if (qp->qh2.fp==nullptr) {
+               qp->qh2.fp=&rF;
+            } else {
+               qp->qh2.insert(rF, level+1,
+                              x+180/(2*(level+1)),
+                              y-90/(2*(level+1)));
+            }
+         }
+      } else {
+         if ((double)rF["location"][1] >= y) {
+            if (qp->qh3.fp==nullptr) {
+               qp->qh3.fp=&rF;
+            } else {
+               qp->qh3.insert(rF, level+1,
+                              x-180/(2*(level+1)),
+                              y+90/(2*(level+1)));
+            }
+         } else {
+            if (qp->qh4.fp==nullptr) {
+               qp->qh4.fp=&rF;
+            } else {
+               qp->qh4.insert(rF, level+1,
+                              x-180/(2*(level+1)),
+                              y-90/(2*(level+1)));
+            }
+         }
+      }
+   }
+}
+
+map<string, QuadHldr> thnsTreeMap;
+void makeThngsTree () {
+   FFJSON& things = config["virtualWebHosts"]["underconstruction"]["things"];
+   FFJSON::Iterator it = things.begin();
+   while (it!= things.end()) {
+      string thing = it.getIndex();
+      int size=it->size;
+      for (int i=0; i<size; ++i) {
+         thnsTreeMap[thing].insert((*it)[i]);
+      }
+      QuadHldr qh={0};
+      ++it;
+   }
+}
+
 WSServer::WSServer (
    const char* pcHostName, int iDebugLevel,
    int iPort, int iSecurePort, const char* pcSSLCertFilePath,
@@ -706,6 +843,10 @@ WSServer::WSServer (
    #endif
    int iSysLogOptions
 ) {
+   ffl_info(FPL_HTTPSERV, "Building quad tree..");
+   ffl_debug(FPL_HTTPSERV, "malloc size: %d\n",
+             malloc_usable_size(&config["virtualWebHosts"]));
+   makeThngsTree();
    mg_mgr_init(&mgr);
    mg_mgr_init(&mail_mgr);
    char httpsport[16];

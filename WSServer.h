@@ -68,4 +68,23 @@ private:
    bool s_quit = false;
 */
 };
+
+struct QuadTree;
+
+union QuadHldr {
+   QuadTree* qp;
+   FFJSON* fp;
+   QuadTree* insert (
+      FFJSON& rF, unsigned int level = 0,
+      double x = 0.0, double y = 0.0
+   );
+};
+
+struct QuadTree {
+   QuadHldr qh1;
+   QuadHldr qh2;
+   QuadHldr qh3;
+   QuadHldr qh4;
+};
+
 #endif /* WSSERVER_H */
