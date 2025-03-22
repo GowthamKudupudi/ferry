@@ -69,22 +69,55 @@ private:
 */
 };
 
-struct QuadTree;
+struct QuadNode;
+struct Circle {
+   float x;
+   float y;
+   float r;
+};
+union QuadHldr;
+struct WholeQuadNode;
+struct ParentQuadHldr {
+   ParentQuadHldr (deque<WholeQuadNode>* pqcqh=nullptr, QuadHldr* hldr=nullptr,
+                   ParentQuadHldr* pQH = nullptr, float x = 0, float y = 0) 
+      : pqcqh(pqcqh), hldr(hldr), pQH(pQH), x(x), y(y)
+      {
+            
+      }
+   QuadHldr* hldr;
+   ParentQuadHldr* pQH;
+   float x,y;
+   deque<WholeQuadNode>* pqcqh;
+};
+struct WholeQuadNode {
+   QuadHldr* qh;
+   float x,y,dx,dy;
+   int xsign,ysign,rxsign,rysign;
+   ParentQuadHldr pqh;
+};
 
 union QuadHldr {
-   QuadTree* qp;
+   QuadHldr () {
+      qp=nullptr;
+   };
+   QuadNode* qp;
    FFJSON* fp;
-   QuadTree* insert (
-      FFJSON& rF, unsigned int level = 0,
-      double x = 0.0, double y = 0.0
+   uint insert (
+      FFJSON& rF, uint level = 0,
+      float x = 0.0, float y = 0.0
+   );
+   uint getPointsFromQuad (
+      vector<FFJSON*>& pts, Circle& c,
+      uint minPts = 20, uint level=0, ParentQuadHldr* pQH = nullptr,
+      bool pseudo = false, float shortestRDist = 201.3
    );
 };
 
-struct QuadTree {
-   QuadHldr qh1;
-   QuadHldr qh2;
-   QuadHldr qh3;
-   QuadHldr qh4;
+struct QuadNode {
+   QuadHldr en;
+   QuadHldr es;
+   QuadHldr wn;
+   QuadHldr ws;
 };
 
 #endif /* WSSERVER_H */

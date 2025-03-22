@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <string.h>
+#include <math.h>
 #include <sys/time.h>
 #include <assert.h>
 #ifdef WIN32
@@ -46,6 +47,7 @@
 #include <malloc.h>
 #include <functional>
 #include <chrono>
+#include <deque>
 
 typedef const char* ccp;
 using namespace std;
@@ -270,9 +272,9 @@ void tls_ntls_common (
       referer=sessionData["referer"];
       username = strstr(referer,":");
       protolen = username - referer;
-      if (username==nullptr || protolen<0) {
-         ffl_debug(FPL_HTTPSERV, "noproto");
-         mg_http_reply(c, 200, headers, "noproto");
+      if (username==nullptr || protolen<0 || protolen>=8) {
+         ffl_debug(FPL_HTTPSERV, "badproto");
+         mg_http_reply(c, 200, headers, "badproto");
          goto done;
       }
       sprintf(proto,"%.*s",protolen,(ccp)sessionData["referer"]);
@@ -578,8 +580,8 @@ void tls_ntls_common (
                if (!cthings[i])
                   continue;
                if (i>uthings.size) {
-                  mg_http_reply(c, 200, headers, "{%Q:%Q}",
-                                "update", "sizeExceeded");
+                  mg_http_reply(c, 400, headers, "{%Q:%Q}",
+                                "error", "sizeExceeded");
                   goto done;
                }
                if (!uthings[i]) {
@@ -588,7 +590,8 @@ void tls_ntls_common (
                   FFJSON& ln = uthings[i]["user"].addLink(users, username);
                   if (!ln)
                      delete &ln;
-               } else if (strcasecmp(cthings[i]["name"], uthings[i]["name"])) {
+               } else if (strcasecmp(cthings[i]["name"],
+                                     uthings[i]["name"])) {
                   things[(ccp)uthings[i]["name"]].erase(&uthings[i]);
                }
                id=cthings[i]["id"];
@@ -753,78 +756,374 @@ void fn_tls (
 }
 
 double eastWall,westWall,northWall,southWall;
-QuadTree* QuadHldr::insert(FFJSON& rF, unsigned int level, double x, double y) {
+uint QuadHldr::insert(FFJSON& rF, uint level, float x, float y) {
+   printf("x,y: %lf,%lf\n", x, y);
    if (fp==nullptr) {
       fp=&rF;
    } else if (malloc_usable_size(fp)==24) {
       FFJSON& tmp = *fp;
-      qp = new QuadTree();
+      qp = new QuadNode();
       if ((double)tmp["location"][0] >= x) {
          if ((double)tmp["location"][1] >= y) {
-            qp->qh1.fp=&tmp;
+            qp->en.fp=&tmp;
          } else {
-            qp->qh2.fp=&tmp;
+            qp->es.fp=&tmp;
          }
       } else {
          if ((double)tmp["location"][1] >= y) {
-            qp->qh3.fp=&tmp;
+            qp->wn.fp=&tmp;
          } else {
-            qp->qh4.fp=&tmp;
+            qp->ws.fp=&tmp;
          }
       }
-      insert(rF,level,x,y);
+      return insert(rF,level,x,y);
    } else {
       if ((double)rF["location"][0] >= x) {
          if ((double)rF["location"][1] >= y) {
-            if (qp->qh1.fp==nullptr) {
-               qp->qh1.fp=&rF;
+            if (qp->en.fp==nullptr) {
+               qp->en.fp=&rF;
             } else {
-               qp->qh1.insert(rF, level+1,
-                              x+180/(2*(level+1)),
-                              y+90/(2*(level+1)));
+               return qp->en.insert(
+                  rF, level+1, x+180/(pow(2,level+1)),
+                  y+90/(pow(2,level+1)));
             }
          } else {
-            if (qp->qh2.fp==nullptr) {
-               qp->qh2.fp=&rF;
+            if (qp->es.fp==nullptr) {
+               qp->es.fp=&rF;
             } else {
-               qp->qh2.insert(rF, level+1,
-                              x+180/(2*(level+1)),
-                              y-90/(2*(level+1)));
+               return qp->es.insert(
+                  rF, level+1, x+180/(pow(2, level+1)), y-90/(pow(2, level+1)));
             }
          }
       } else {
          if ((double)rF["location"][1] >= y) {
-            if (qp->qh3.fp==nullptr) {
-               qp->qh3.fp=&rF;
+            if (qp->wn.fp==nullptr) {
+               qp->wn.fp=&rF;
             } else {
-               qp->qh3.insert(rF, level+1,
-                              x-180/(2*(level+1)),
-                              y+90/(2*(level+1)));
+               return qp->wn.insert(
+                  rF, level+1, x-180/(pow(2, level+1)), y+90/(pow(2, level+1)));
             }
          } else {
-            if (qp->qh4.fp==nullptr) {
-               qp->qh4.fp=&rF;
+            if (qp->ws.fp==nullptr) {
+               qp->ws.fp=&rF;
             } else {
-               qp->qh4.insert(rF, level+1,
-                              x-180/(2*(level+1)),
-                              y-90/(2*(level+1)));
+               return qp->ws.insert(
+                  rF, level+1, x-180/(pow(2, level+1)), y-90/(pow(2, level+1)));
             }
          }
       }
    }
+   return level;
+}
+
+uint QuadHldr::getPointsFromQuad (
+   vector<FFJSON*>& pts, Circle& c, uint minPts,
+   uint level, ParentQuadHldr* pQH,  bool pseudo, float shortestRDist
+) {
+   if (fp==nullptr) {
+   } else if (malloc_usable_size(fp)==24) {
+      pts.push_back(fp);
+   } else {
+      deque<WholeQuadNode> qcqh;
+      ParentQuadHldr ptqh(&qcqh);
+      ptqh.hldr=this;
+      ptqh.pQH=pQH;
+      float x, y;
+      if (pQH==nullptr) {
+         x=0;y=0;
+      } else {
+         x=pQH->x;y=pQH->y;
+      }
+      printf("%f,%f\n", x, y);
+      fflush(stdout);
+      float dx = 180/(pow(2,level+1));
+      float dy = 90/(pow(2,level+1));
+      float ddx = 180/(pow(2,level+2));
+      float ddy = 90/(pow(2,level+2));
+      QuadHldr* qh = &qp->en;
+      QuadHldr* cqh = nullptr;
+      float cx,cy;
+      int xsign=1;
+      int ysign=1;
+      int minus=-1;
+      int cxsign, cysign;
+      float dist;
+      float nearest=201.3;
+      QuadHldr* nearestQH;
+      deque<WholeQuadNode>::iterator it,eit;
+      WholeQuadNode wqn;
+      for (int i=0;i<4; ++i, ++qh, xsign*=ysign, ysign*=minus) {
+         cxsign=xsign;cysign=ysign;
+         if (xsign*c.x>=xsign*x && ysign*c.y>=ysign*y) {
+            break;
+         }
+      }
+      cqh = qh;
+      cx = x+cxsign*dx;
+      cy = y+cysign*dy;
+      ptqh.x=cx;
+      ptqh.y=cy;
+      bool pseudo = false;
+      if (!qh->fp) {
+         FFJSON tmp;
+         tmp["location"][0]=c.x;
+         tmp["location"][1]=c.y;
+         cqh = new QuadHldr();
+         cqh->insert(tmp, level+1, cx, cy);
+         pseudo=true;
+      }
+      if (!pQH)
+         goto imNibrs;
+      it = pQH->pqcqh->begin();
+      eit = pQH->pqcqh->end();
+      if (it==eit)
+         goto imNibrs;
+      --eit;
+      while(1) {
+         bool q = false;
+         if (it==eit)
+            q=true;
+         deque<WholeQuadNode>::iterator cit=it;
+         ++it;
+         int nxsign = cit->xsign;
+         int nysign = cit->ysign;
+         int rxsign = cit->rxsign;
+         int rysign = cit->rysign;
+         int ncxsign;
+         int ncysign;
+         if ((nxsign==cxsign && rxsign!=cxsign) ||
+             (nysign==cysign && rysign!=cysign)) {
+            pQH->pqcqh->erase(cit);
+         } else {
+            ncxsign=-rxsign*cxsign;
+            ncysign=-rysign*cysign;
+            float qx = cit->x;
+            float qy = cit->y;
+            float ddx = cit->dx/2;
+            float ddy = cit->dy/2;
+            float nx = qx + ncxsign*ddx;
+            float ny = qy + ncysign*ddy;
+            QuadNode* qn = cit->qh->qp;
+            if (malloc_usable_size(qn)==24) {
+               continue;
+            }
+            int xind=nxsign>0?0:1;
+            xind<<=1;
+            xind|=nysign>0?0:1;
+            wqn.qh=&qn->en+xind;
+            if (wqn.qh->qp != nullptr) {
+               wqn.x=nx;
+               wqn.y=ny;
+               wqn.dx=ddx;
+               wqn.dy=ddy;
+               wqn.xsign=ncxsign;
+               wqn.ysign=ncysign;
+               wqn.rxsign=nxsign;
+               wqn.rysign=nysign;
+               qcqh.push_back(wqn);
+               dist = pow(c.x-nx,2)+pow(c.y-ny,2);
+               if (dist<nearest) {
+                  nearest=dist;
+                  nearestQH=wqn.qh;
+               }
+            }
+            bool addOther = false;
+            if (nxsign==cxsign) {
+               ncxsign=-ncxsign;
+               addOther=true;
+            }
+            if (nysign==cysign) {
+               ncysign=-ncysign;
+               addOther=true;
+            }
+            if (addOther) {
+               nx = qx + ncxsign*ddx;
+               ny = qy + ncysign*ddy;
+               int xind=nxsign>0?0:1;
+               xind<<=1;
+               xind|=nysign>0?0:1;
+               wqn.qh=&qn->en+xind;
+               if (wqn.qh->qp != nullptr) {
+                  wqn.x=nx;
+                  wqn.y=ny;
+                  wqn.dx=ddx;
+                  wqn.dy=ddy;
+                  wqn.xsign=ncxsign;
+                  wqn.ysign=ncysign;
+                  wqn.rxsign=nxsign;
+                  wqn.rysign=nysign;
+                  qcqh.push_back(wqn);
+                  dist = pow(c.x-nx,2)+pow(c.y-ny,2);
+                  if (dist<nearest) {
+                     nearest=dist;
+                     nearestQH=wqn.qh;
+                  }
+               }
+            }
+         }
+      }
+      
+     imNibrs:
+      qh = &qp->en;
+      for (int i=0,ysign=xsign=1; i<4;
+           ++i, ++qh, xsign*=ysign, ysign*=minus) {
+         float qx = x+xsign*dx;
+         float qy = y+ysign*dy;
+         if (!qh->fp || malloc_usable_size(qh->fp)==24 ||
+             (xsign==cxsign && ysign==cysign)) {
+            continue;
+         }
+         if (xsign!=cxsign) {
+            if (ysign!=cysign) {
+               float nx = qx - cxsign*ddx;
+               float ny = qy - cysign*ddy;
+               int xind=-cxsign>0?0:1;
+               int yind=-cysign>0?0:1;
+               xind<<=1;
+               xind|=yind;
+               wqn.qh=&qh->qp->en+xind;
+               if (wqn.qh->qp != nullptr) {
+                  wqn.x=nx;
+                  wqn.y=ny;
+                  wqn.dx=ddx;
+                  wqn.dy=ddy;
+                  wqn.xsign=-cxsign;
+                  wqn.ysign=-cysign;
+                  wqn.rxsign=xsign;
+                  wqn.rysign=ysign;
+                  qcqh.push_back(wqn);
+                  dist = pow(c.x-nx,2)+pow(c.y-ny,2);
+                  if (dist<nearest) {
+                     nearest=dist;
+                     nearestQH=wqn.qh;
+                  }
+               }
+            } else {
+               float nx = qx - cxsign*ddx;
+               float ny = qy + cysign*ddy;
+               int xind=-cxsign>0?0:1;
+               int yind=cysign>0?0:1;
+               xind<<=1;
+               xind|=yind;
+               wqn.qh=&qh->qp->en+xind;
+               if (wqn.qh->qp != nullptr) {
+                  wqn.x=nx;
+                  wqn.y=ny;
+                  wqn.dx=ddx;
+                  wqn.dy=ddy;
+                  wqn.xsign=-cxsign;
+                  wqn.ysign=cysign;
+                  wqn.rxsign=xsign;
+                  wqn.rysign=ysign;
+                  qcqh.push_back(wqn);
+               }
+               ny = qy - cysign*ddy;
+               xind=-cxsign>0?0:1;
+               yind=-cysign>0?0:1;
+               xind<<=1;
+               xind|=yind;
+               wqn.qh=&qh->qp->en+xind;
+               if (wqn.qh->qp != nullptr) {
+                  wqn.x=nx;
+                  wqn.y=ny;
+                  wqn.dx=ddx;
+                  wqn.dy=ddy;
+                  wqn.xsign=-cxsign;
+                  wqn.ysign=-cysign;
+                  wqn.rxsign=xsign;
+                  wqn.rysign=ysign;
+                  qcqh.push_back(wqn);
+                  dist = pow(c.x-nx,2)+pow(c.y-ny,2);
+                  if (dist<nearest) {
+                     nearest=dist;
+                     nearestQH=wqn.qh;
+                  }
+               }
+            }
+         } else {
+            if (ysign!=cysign) {
+               float nx = qx + cxsign*ddx;
+               float ny = qy - cysign*ddy;
+               int xind=cxsign>0?0:1;
+               int yind=-cysign>0?0:1;
+               xind<<=1;
+               xind|=yind;
+               wqn.qh=&qh->qp->en+xind;
+               if (wqn.qh->qp != nullptr) {
+                  wqn.x=nx;
+                  wqn.y=ny;
+                  wqn.dx=ddx;
+                  wqn.dy=ddy;
+                  wqn.xsign=cxsign;
+                  wqn.ysign=-cysign;
+                  wqn.rxsign=xsign;
+                  wqn.rysign=ysign;
+                  qcqh.push_back(wqn);
+                  dist = pow(c.x-nx,2)+pow(c.y-ny,2);
+                  if (dist<nearest) {
+                     nearest=dist;
+                     nearestQH=wqn.qh;
+                  }
+               }
+               nx = qx - cxsign*ddx;
+               xind=-cxsign>0?0:1;
+               yind=-cysign>0?0:1;
+               xind<<=1;
+               xind|=yind;
+               wqn.qh=&qh->qp->en+xind;
+               if (wqn.qh->qp != nullptr) {
+                  wqn.x=nx;
+                  wqn.y=ny;
+                  wqn.dx=ddx;
+                  wqn.dy=ddy;
+                  wqn.xsign=-cxsign;
+                  wqn.ysign=-cysign;
+                  wqn.rxsign=xsign;
+                  wqn.rysign=ysign;
+                  qcqh.push_back(wqn);
+                  dist = pow(c.x-nx,2)+pow(c.y-ny,2);
+                  if (dist<nearest) {
+                     nearest=dist;
+                     nearestQH=wqn.qh;
+                  }
+               }
+            }
+         }
+      }
+   
+      if (cqh) {
+         if (!qcqh.empty() || (pQH && !pQH->pqcqh->empty()) || !pseudo) {
+            ptqh.x=cx; ptqh.y=cy;
+            cqh->getPointsFromQuad(pts, c, minPts, level+1, &ptqh, pseudo);
+            if (pts.size()==0) {
+               if (!pseudo) {
+                  pts.push_back(cqh->fp);
+               } else {
+                  pts.push_back(nearestQH->fp);
+               }
+            }
+         }
+         if (pseudo) {
+            delete cqh;
+         }
+      }
+   }
+   return level;
 }
 
 map<string, QuadHldr> thnsTreeMap;
 void makeThngsTree () {
    FFJSON& things = config["virtualWebHosts"]["underconstruction"]["things"];
    FFJSON::Iterator it = things.begin();
+   FFJSON::Iterator tit;
    while (it!= things.end()) {
       string thing = it.getIndex();
-      int size=it->size;
-      for (int i=0; i<size; ++i) {
-         thnsTreeMap[thing].insert((*it)[i]);
+      tit = it->begin();
+      while (tit!=it->end()) {
+         uint level=thnsTreeMap[thing].insert((*tit));
+         printf ("insertLevel: %u\n", level);
+         ++tit;
       }
-      QuadHldr qh={0};
       ++it;
    }
 }
@@ -847,6 +1146,13 @@ WSServer::WSServer (
    ffl_debug(FPL_HTTPSERV, "malloc size: %d\n",
              malloc_usable_size(&config["virtualWebHosts"]));
    makeThngsTree();
+   vector<FFJSON*> pts;
+   Circle c = {12.91, 77.61, 0.001};
+   thnsTreeMap["batman"].getPointsFromQuad(pts, c);
+   for (int i=0;i<pts.size();++i) {
+      printf("x: %lff, y: %lf\n",(double)(*pts[i])["location"][0],
+             (double)(*pts[i])["location"][1]);
+   }
    mg_mgr_init(&mgr);
    mg_mgr_init(&mail_mgr);
    char httpsport[16];
