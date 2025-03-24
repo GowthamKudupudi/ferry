@@ -95,6 +95,17 @@ struct WholeQuadNode {
    int xsign,ysign,rxsign,rysign;
    ParentQuadHldr pqh;
 };
+struct CompareByDistanceToCenter {
+   bool operator () (FFJSON* f1, FFJSON* f2) {
+      return
+         pow(cx-(float)(*f1)["location"][0],2) +
+         pow(cy-(float)(*f1)["location"][1],2) <
+         pow(cx-(float)(*f2)["location"][0],2) +
+         pow(cy-(float)(*f2)["location"][1],2);
+   }
+   CompareByDistanceToCenter (float cx, float cy):cx(cx),cy(cy) {}
+   float cx,cy;
+};
 
 union QuadHldr {
    QuadHldr () {
@@ -107,10 +118,15 @@ union QuadHldr {
       float x = 0.0, float y = 0.0
    );
    uint getPointsFromQuad (
-      vector<FFJSON*>& pts, Circle& c,
+      set<FFJSON*,CompareByDistanceToCenter>& pts, Circle& c,
       uint minPts = 20, uint level=0, ParentQuadHldr* pQH = nullptr,
       bool pseudo = false, float shortestRDist = 201.3
    );
+   uint getPointsFromRadius (
+      set<FFJSON*, CompareByDistanceToCenter>& pts, Circle& c,
+      uint minPts=30, uint level=0, float x=0, float y=0
+   );
+   uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts);
 };
 
 struct QuadNode {
