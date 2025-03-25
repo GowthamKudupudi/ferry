@@ -115,7 +115,7 @@ union QuadHldr {
    FFJSON* fp;
    uint insert (
       FFJSON& rF, uint level = 0,
-      float x = 0.0, float y = 0.0
+      float x = 0.0, float y = 0.0, bool deleteLeaf = false
    );
    uint getPointsFromQuad (
       set<FFJSON*,CompareByDistanceToCenter>& pts, Circle& c,
