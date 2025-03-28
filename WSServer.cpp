@@ -548,8 +548,9 @@ void tls_ntls_common (
          vector<string> swds = explode(srchStr);
          vector<map<string,QuadHldr>::iterator> vtit;
          for (int k=0;k<swds.size();++k) {
+            string mwd = m3e.encode(swds[k]).first;
             map<string,QuadHldr>::iterator tit =
-               thnsTreeMap.lower_bound(swds[k]);
+               thnsTreeMap.lower_bound(mwd);
             if (tit!=thnsTreeMap.end()) {
                vtit.push_back(tit);
             }
@@ -570,15 +571,40 @@ void tls_ntls_common (
             rbs[bid]["geoposition"] = body["geoposition"];
          }
          CompareByDistanceToCenter comp(C.x, C.y);
-         std::set<FFJSON*, CompareByDistanceToCenter> pts(comp);
+         map<FFJSON*, uint> score;
          for (int k=0;k<vtit.size();++k) {
+            set<FFJSON*, CompareByDistanceToCenter> pts(comp);
             vtit[k]->second.getPointsFromRadius(pts, C);
+            set<FFJSON*, CompareByDistanceToCenter>::iterator it =
+               pts.begin();
+            while (it!=pts.end()) {
+               uint& s= score[*it];
+               ++s;
+               ++it;
+            }
          }
-         atit = pts.begin();
-         while (atit != pts.end()) {
-            reply["things"][k]=*(*atit);
+         list<pair<FFJSON*, uint>> vp;
+         map<FFJSON*, uint>::iterator it=score.begin();
+         while (it!=score.end()) {
+            list<pair<FFJSON*, uint>>::iterator lit = vp.begin();
+            while(1){
+               if (it->second>lit->second) {
+                  vp.insert(lit,pair(it->first, it->second));
+                  break;
+               }
+               ++lit;
+               if (lit==vp.end()) {
+                  vp.insert(lit,pair(it->first, it->second));
+                  break;
+               }
+            }
+            ++it;
+         }
+         list<pair<FFJSON*, uint>>::iterator lit = vp.begin();
+         while (lit != vp.end()) {
+            reply["things"][k]=*(lit->first);
             ++k;
-            ++atit;
+            ++lit;
          }
          mg_http_reply(c, 200, headers, "%s",
                        reply.stringify(true).c_str());         
@@ -627,6 +653,7 @@ void tls_ntls_common (
                for (int k=0; k<cwds.size(); ++k) {
                   cwds[k]=m3e.encode(cwds[k]).first;
                }
+               cthings[i].erase("user");
                if (!uthings[j]) {
                   cthings[i]["id"] = uthings.size?
                      ((int)uthings[j-1]["id"]) + 1 : 0;
@@ -653,16 +680,17 @@ void tls_ntls_common (
                   if ((double)cloc[0]!=(double)uloc[0] ||
                       (double)cloc[1]!=(double)uloc[1] || nameChanged) {
                      for (int k=0; k<uwds.size(); ++k) {
-                        thnsTreeMap[uwds[k]].insert(uthings[j], true);
+                        QuadHldr& qh = thnsTreeMap[uwds[k]];
+                        qh.insert(uthings[j], true);
                      }
                      locChanged=true;
                   }
                }
-               cthings[i]["user"]=FFJSON::UNDEFINED;
                uthings[j]=cthings[i];
                if (locChanged || nameChanged) {
                   for (int k=0; k<cwds.size(); ++k) {
-                     thnsTreeMap[cwds[k]].insert(uthings[j]);
+                     QuadHldr& qh = thnsTreeMap[cwds[k]];
+                     qh.insert(uthings[j]);
                   }
                }
                for (int k=0; k<cwds.size(); ++k) {
@@ -818,12 +846,20 @@ void fn_tls (
    tls_ntls_common(c, ev, ev_data, fn_data);
 }
 
-uint QuadHldr::insert(FFJSON& rF, bool deleteLeaf, uint level, float x,
-                      float y) {
+set<void*> ffpset;
+set<void*> vecffset;
+
+uint QuadHldr::insert (FFJSON& rF, bool deleteLeaf, uint level, float x,
+                       float y) {
    printf("x,y: %lf,%lf\n", x, y);
    if (fp==nullptr) {
       fp=&rF;
-   } else if (malloc_usable_size(fp)==24) {
+      ffpset.insert(fp);
+      return level;
+   }
+   set<void*>::iterator fit = ffpset.find(fp);
+   set<void*>::iterator vit = vecffset.find(vp);
+   if (fit != ffpset.end() || vit != vecffset.end()) {
       if (deleteLeaf) {
          if (fp==&rF)
             fp=nullptr;
@@ -831,37 +867,35 @@ uint QuadHldr::insert(FFJSON& rF, bool deleteLeaf, uint level, float x,
       }
       if (fp==&rF)
          return level;
+      FFJSON* tfp = fit != ffpset.end() ? fp : (*vp)[0];
+      if ((float)(*tfp)["location"][0]==(float)rF["location"][0] &&
+          (float)(*tfp)["location"][1]==(float)rF["location"][1]) {
+         if (fit != ffpset.end()) {
+            vp = new vector<FFJSON*>();
+            vecffset.insert(vp);
+            vp->push_back(tfp);
+            vp->push_back(&rF);
+         } else {
+            vp->push_back(&rF);
+         }
+         return level;
+      }
       FFJSON& tmp = *fp;
       qp = new QuadNode();
-      QuadHldr* qh = nullptr;
-      short q=0;
       if ((double)tmp["location"][0] >= x) {
          if ((double)tmp["location"][1] >= y) {
             qp->en.fp=&tmp;
-            q=0;
          } else {
             qp->es.fp=&tmp;
-            q=1;
          }
       } else {
          if ((double)tmp["location"][1] >= y) {
             qp->wn.fp=&tmp;
-            q=2;
          } else {
             qp->ws.fp=&tmp;
-            q=3;
          }
       }
-      if ((float)tmp["location"][0]==(float)rF["location"][0] &&
-          (float)rF["location"][1]==(float)rF["location"][1]) {
-         ++q;
-         if (q==4)
-            q=0;
-         qh=&qp->en+q;
-         qh->fp=&rF;
-      } else {
-         return insert(rF,deleteLeaf,level,x,y);
-      }
+      return insert(rF,deleteLeaf,level,x,y);
    } else {
       float dx = 180/(pow(2,level+1));
       float dy = 90/(pow(2,level+1));
@@ -926,13 +960,29 @@ uint QuadHldr::getPointsFromRadius (
    fflush(stdout);
    if (fp==nullptr) {
       return 0;
-   } else if (malloc_usable_size(fp)==24) {
-      float cx = (float)(*fp)["location"][0];
-      float cy = (float)(*fp)["location"][1];
+   }
+   set<void*>::iterator fit = ffpset.find(fp);
+   set<void*>::iterator vit = vecffset.find(vp);
+   
+   if (fit != ffpset.end() || vit != vecffset.end()) {
+      FFJSON* tmp;
+      if (fit!=ffpset.end())
+         tmp = fp;
+      else
+         tmp = (*vp)[0];
+      float cx = (float)(*tmp)["location"][0];
+      float cy = (float)(*tmp)["location"][1];
       float dist = pow(pow(cx-c.x,2)+pow(cy-c.y,2), 0.5);
       if (dist<=c.r) {
-         pts.insert(fp);
-         return 1;
+         if (fit != ffpset.end()) {
+            pts.insert(fp);
+            return 1;
+         } else {
+            for (int i=0;i<vp->size();++i) {
+               pts.insert((*vp)[i]);
+            }
+            return vp->size();
+         }
       }
       return 0;
    } else {
@@ -1265,7 +1315,8 @@ void makeThngsTree () {
       string thing = it.getIndex();
       tit = it->begin();
       while (tit!=it->end()) {
-         uint level=thnsTreeMap[thing].insert((*tit->val.fptr));
+         QuadHldr& qh = thnsTreeMap[thing];
+         uint level=qh.insert((*tit->val.fptr));
          printf ("insertLevel: %u\n", level);
          ++tit;
       }

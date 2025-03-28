@@ -78,12 +78,11 @@ struct Circle {
 union QuadHldr;
 struct WholeQuadNode;
 struct ParentQuadHldr {
-   ParentQuadHldr (deque<WholeQuadNode>* pqcqh=nullptr, QuadHldr* hldr=nullptr,
-                   ParentQuadHldr* pQH = nullptr, float x = 0, float y = 0) 
+   ParentQuadHldr (
+      deque<WholeQuadNode>* pqcqh=nullptr, QuadHldr* hldr=nullptr,
+      ParentQuadHldr* pQH = nullptr, float x = 0, float y = 0) 
       : pqcqh(pqcqh), hldr(hldr), pQH(pQH), x(x), y(y)
-      {
-            
-      }
+      {}
    QuadHldr* hldr;
    ParentQuadHldr* pQH;
    float x,y;
@@ -97,11 +96,16 @@ struct WholeQuadNode {
 };
 struct CompareByDistanceToCenter {
    bool operator () (FFJSON* f1, FFJSON* f2) {
-      return
-         pow(cx-(float)(*f1)["location"][0],2) +
-         pow(cy-(float)(*f1)["location"][1],2) <
-         pow(cx-(float)(*f2)["location"][0],2) +
-         pow(cy-(float)(*f2)["location"][1],2);
+      float x1 = (*f1)["location"][0];
+      float y1 = (*f1)["location"][1];
+      float x2 = (*f2)["location"][0];
+      float y2 = (*f2)["location"][1];
+      if (x1==x2 && y1==y2) {
+         return f1 < f2;
+      }
+      float r1 = pow(cx-x1,2) + pow(cy-y1,2);
+      float r2 = pow(cx-x2,2) + pow(cy-y2,2);
+      return (r1 < r2);
    }
    CompareByDistanceToCenter (float cx, float cy):cx(cx),cy(cy) {}
    float cx,cy;
@@ -113,6 +117,7 @@ union QuadHldr {
    };
    QuadNode* qp;
    FFJSON* fp;
+   vector<FFJSON*>* vp;
    uint insert (
       FFJSON& rF, bool deleteLeaf = false, uint level = 0,
       float x = 0.0, float y = 0.0
