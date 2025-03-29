@@ -805,6 +805,12 @@ void tls_ntls_common (
          if (fofst+chnkSz >= ttlSz) {
             user.erase("pendingThings");
             user["things"][thngi]["pics"][picId].erase("partial");
+            auto now = chrono::high_resolution_clock::now();
+            auto now_ms =
+               std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+            auto epoch = now_ms.time_since_epoch();
+            long lepoch = epoch.count();
+            user["things"][thngi]["pics"][picId]["ts"]=lepoch;
             printf("pendingThings\n");
             users.save();
          }
