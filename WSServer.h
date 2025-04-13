@@ -18,6 +18,7 @@
 #include <map>
 #include <list>
 #include <thread>
+#include <queue>
 
 using namespace std;
 using namespace placeholders;
@@ -79,17 +80,17 @@ union QuadHldr;
 struct WholeQuadNode;
 struct ParentQuadHldr {
    ParentQuadHldr (
-      deque<WholeQuadNode>* pqcqh=nullptr, QuadHldr* hldr=nullptr,
+      deque<WholeQuadNode>* pqcqh=nullptr, QuadNode* node=nullptr,
       ParentQuadHldr* pQH = nullptr, float x = 0, float y = 0) 
-      : pqcqh(pqcqh), hldr(hldr), pQH(pQH), x(x), y(y)
+      : pqcqh(pqcqh), node(node), pQH(pQH), x(x), y(y)
       {}
-   QuadHldr* hldr;
+   QuadNode* node;
    ParentQuadHldr* pQH;
    float x,y;
    deque<WholeQuadNode>* pqcqh;
 };
 struct WholeQuadNode {
-   QuadHldr* qh;
+   QuadNode* qn;
    float x,y,dx,dy;
    int xsign,ysign,rxsign,rysign;
    ParentQuadHldr pqh;
@@ -110,6 +111,17 @@ struct CompareByDistanceToCenter {
    CompareByDistanceToCenter (float cx, float cy):cx(cx),cy(cy) {}
    float cx,cy;
 };
+typedef unsigned uchar;
+struct Direction {
+   char x;
+   char y;
+};
+struct NdNPrn {
+   FFJSON* nd;
+   QuadNode* prn;
+};
+void findNeighbours (FFJSON* f, vector<NdNPrn>& pts,
+                     QuadNode* pQN, Direction d = {0});
 
 union QuadHldr {
    QuadHldr () {
@@ -117,21 +129,23 @@ union QuadHldr {
    };
    QuadNode* qp;
    FFJSON* fp;
-   vector<FFJSON*>* vp;
+   set<FFJSON*>* sp;
    uint insert (
       FFJSON& rF, bool deleteLeaf = false, uint level = 0,
-      float x = 0.0, float y = 0.0
+      float x = 0.0, float y = 0.0, QuadNode* pQN = nullptr
    );
    uint getPointsFromQuad (
-      set<FFJSON*,CompareByDistanceToCenter>& pts, Circle& c,
+      vector<NdNPrn>& pts, Circle& c,
       uint minPts = 20, uint level=0, ParentQuadHldr* pQH = nullptr,
       bool pseudo = false, float shortestRDist = 201.3
    );
    uint getPointsFromRadius (
-      set<FFJSON*, CompareByDistanceToCenter>& pts, Circle& c,
-      uint minPts=30, uint level=0, float x=0, float y=0
+      set<FFJSON*, CompareByDistanceToCenter>& pts, Circle& c, uint minPts=30,
+      uint level=0, float x=0, float y=0, QuadNode* pQN = nullptr
    );
-   uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts);
+   uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
+                              QuadNode* pQN);
+   void addChildrenOnEdge (Direction d, vector<NdNPrn>& pts);
 };
 
 struct QuadNode {

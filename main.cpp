@@ -396,6 +396,11 @@ int run () {
    return 0;
 }
 
+void sigpipeHandler (int unused) {
+   printf("unused\n");
+   fflush(stdout);
+}
+
 int main (int argc, char** argv) {
    Authentication_ Authentication ("gowtham", "tornshoees");
    if (Authentication .is_valid()) {
@@ -407,6 +412,8 @@ int main (int argc, char** argv) {
    stdinfd = dup (0);
    stdoutfd = dup (1);
    stderrfd = dup (2);
+   struct sigaction sa = {sigpipeHandler};
+   sigaction(SIGPIPE, &sa, NULL);
    const char* const short_options = "cdf:hirs:t:ux";
    string opt;
    const struct option long_options [] = {
