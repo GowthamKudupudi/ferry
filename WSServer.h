@@ -95,34 +95,13 @@ struct WholeQuadNode {
    int xsign,ysign,rxsign,rysign;
    ParentQuadHldr pqh;
 };
-struct CompareByDistanceToCenter {
-   bool operator () (FFJSON* f1, FFJSON* f2) {
-      float x1 = (*f1)["location"][0];
-      float y1 = (*f1)["location"][1];
-      float x2 = (*f2)["location"][0];
-      float y2 = (*f2)["location"][1];
-      if (x1==x2 && y1==y2) {
-         return f1 < f2;
-      }
-      float r1 = pow(cx-x1,2) + pow(cy-y1,2);
-      float r2 = pow(cx-x2,2) + pow(cy-y2,2);
-      return (r1 < r2);
-   }
-   CompareByDistanceToCenter (float cx, float cy):cx(cx),cy(cy) {}
-   float cx,cy;
-};
+struct NdNPrn;
 typedef unsigned uchar;
 struct Direction {
    char x;
    char y;
 };
-struct NdNPrn {
-   FFJSON* nd;
-   QuadNode* prn;
-};
-void findNeighbours (FFJSON* f, vector<NdNPrn>& pts,
-                     QuadNode* pQN, Direction d = {0});
-
+struct CompareByDistanceToCenter;
 union QuadHldr {
    QuadHldr () {
       qp=nullptr;
@@ -145,14 +124,39 @@ union QuadHldr {
    );
    uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
                               QuadNode* pQN);
-   void addChildrenOnEdge (Direction d, vector<NdNPrn>& pts);
+   uint findNeighbours (vector<NdNPrn>& pts,
+                        QuadNode* pQN, Direction d = {0});
+   uint addChildrenOnEdge (Direction d, vector<NdNPrn>& pts, QuadNode* pQN);
 };
 
+struct CompareByDistanceToCenter {
+   bool operator () (FFJSON* pf1, FFJSON* pf2) const {
+      FFJSON& f1 = *pf1;
+      FFJSON& f2 = *pf2;
+      float x1 = f1["location"][0];
+      float y1 = f1["location"][1];
+      float x2 = f2["location"][0];
+      float y2 = f2["location"][1];
+      if (x1==x2 && y1==y2) {
+         return f1 < f2;
+      }
+      float r1 = pow(cx-x1,2) + pow(cy-y1,2);
+      float r2 = pow(cx-x2,2) + pow(cy-y2,2);
+      return (r1 < r2);
+   }
+   CompareByDistanceToCenter (float cx, float cy):cx(cx),cy(cy) {}
+   float cx,cy;
+};
 struct QuadNode {
    QuadHldr en;
    QuadHldr es;
    QuadHldr wn;
    QuadHldr ws;
+};
+
+struct NdNPrn {
+   QuadHldr* qh;
+   QuadNode* prn;
 };
 
 #endif /* WSSERVER_H */
