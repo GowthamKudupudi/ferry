@@ -1061,21 +1061,50 @@ uint QuadHldr::addChildrenOnEdge (Direction d, vector<NdNPrn>& pts,
    uint c = 0;
    uchar ind=0;
    QuadHldr* qh = &resqp->en;
-   QuadHldr* pQH;
+   QuadNode* pQN2;
    set<void*>::iterator it = qpset.lower_bounds(this);
-   pQH=*it;
-   for (int i=d.x; i>=0; i-=d.x) {
-      for (int j=d.y; j>=0; j-=d.y) {
-         ind=d.y|d.x<<1;
-         QuadHldr* lqh = qh+ind;
-         c+=lqh->addChildrenOnEdge(d, pts, pQH->fp);
+   pQN2=*it;
+   char x = 0;
+   char y = 0;
+   char *f, *ff;
+   char *n, *nn;
+   if (d.x!=0) {
+      n = &y; nn=&d.y;
+      f = &x; ff=&d.x;
+   } else {
+      n = &x; nn=&d.x;
+      f = &y; ff=&d.y;
+   }
+   char j;
+   if (*nn!=0) {
+      j=1;
+      if (*nn>0) {
+         *n=0;
+      } else {
+         *n=1;
       }
+   } else {
+      j=2;
+      *n=0;
+   }
+   for (*n=*nn>0?0:1; *n<j; *n+=1) {
+      ind=y|x<<1;
+      QuadHldr* lqh = qh+ind;
+      uint cc = lqh->addChildrenOnEdge(d, pts, pQN2);
+      if (cc==0) {
+         *f=~*f;
+         ind = y|x<<1;
+         lqh = qh+ind;
+         cc = lqh->addChildrenOnEdge(d, pt, pQN2);
+         *f=~*f;
+      }
+      c+=cc;
    }
    return c;
 }
 
 uint QuadHldr::findNeighbours (vector<NdNPrn>& pts,
-                     QuadNode* pQN, Direction d) {
+                               QuadNode* pQN, Direction d) {
    short sign=1;
    short minus=-1;
    uint ni=0;
@@ -1091,9 +1120,9 @@ uint QuadHldr::findNeighbours (vector<NdNPrn>& pts,
    if (d.x!=0 || d.y!=0) {
       char rx = ix-d.x;//quadrant index is opposite to direction
       char ry = iy-d.y;
-      if (rx>1 || rx<0 || ry>1 || ry<0) {
+      if (rx>1 || rx<0 || ry>1 || ry<0 || !pQH->fp) {
          // goto parent
-         
+         pQN->
       } else {
          pQH+=iy|ix<<1;
          pQH->addChildrenOnEdge({(char)-d.x, (char)-d.y}, pts, pQN);
