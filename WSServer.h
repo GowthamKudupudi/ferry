@@ -75,6 +75,8 @@ struct Circle {
    float x;
    float y;
    float r;
+   FFJSON* nf;
+   bool grabIfNearest (FFJSON& f);
 };
 union QuadHldr;
 struct WholeQuadNode;
@@ -88,12 +90,14 @@ struct ParentQuadHldr {
    ParentQuadHldr* pQH;
    float x,y;
    deque<WholeQuadNode>* pqcqh;
+   char ind;
 };
 struct WholeQuadNode {
    QuadNode* qn;
    float x,y,dx,dy;
-   int xsign,ysign,rxsign,rysign;
+   char xsign,ysign,rxsign,rysign;
    ParentQuadHldr pqh;
+   char ind;
 };
 struct NdNPrn;
 typedef unsigned uchar;
@@ -111,22 +115,27 @@ union QuadHldr {
    set<FFJSON*>* sp;
    uint insert (
       FFJSON& rF, bool deleteLeaf = false, uint level = 0,
-      float x = 0.0, float y = 0.0, QuadNode* pQN = nullptr
+      float x = 0.0, float y = 0.0, QuadNode* tQN = nullptr, char tind=0,
+      QuadNode* pQN = nullptr, char ind=0
    );
    uint getPointsFromQuad (
       vector<NdNPrn>& pts, Circle& c,
       uint minPts = 20, uint level=0, ParentQuadHldr* pQH = nullptr,
       bool pseudo = false, float shortestRDist = 201.3
    );
-   uint getPointsFromRadius (
-      set<FFJSON*, CompareByDistanceToCenter>& pts, Circle& c, uint minPts=30,
-      uint level=0, float x=0, float y=0, QuadNode* pQN = nullptr
-   );
-   uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
-                              QuadNode* pQN);
+   // uint getPointsFromRadius (
+   //    set<FFJSON*, CompareByDistanceToCenter>& pts, Circle& c, uint minPts=30,
+   //    uint level=0, float x=0, float y=0, QuadNode* pQN = nullptr
+   // );
+   // uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
+   //                            QuadNode* pQN);
    uint findNeighbours (vector<NdNPrn>& pts,
-                        QuadNode* pQN, Direction d = {0});
-   uint addChildrenOnEdge (Direction d, vector<NdNPrn>& pts, QuadNode* pQN);
+                        QuadNode* pQN, char ind, Direction d = {0},
+                        bool notChild = false);
+   uint addChildrenOnEdge (Direction d, vector<NdNPrn>& pts, QuadNode* pQN,
+                           char ind);
+   void print (Circle& c, uint level = 0, QuadNode* tQN = nullptr,
+               char tind = 0, QuadNode* pQN = nullptr, char ind = 0);
 };
 
 struct CompareByDistanceToCenter {
@@ -152,8 +161,15 @@ struct QuadNode {
    QuadHldr es;
    QuadHldr wn;
    QuadHldr ws;
+   QuadNode ();
 };
-
+struct Qn2 
+{
+   QuadNode* p1;
+   QuadNode* p2;
+   QuadNode* p3;
+   QuadNode* p4;
+};
 struct NdNPrn {
    QuadHldr* qh;
    QuadNode* prn;
