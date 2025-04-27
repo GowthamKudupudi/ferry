@@ -136,6 +136,8 @@ union QuadHldr {
                            char ind);
    void print (Circle& c, uint level = 0, QuadNode* tQN = nullptr,
                char tind = 0, QuadNode* pQN = nullptr, char ind = 0);
+   void del (QuadNode* tQN = nullptr, char tind = 0,
+             QuadNode* pQN = nullptr, char ind = 0);
 };
 
 struct CompareByDistanceToCenter {
@@ -162,6 +164,8 @@ struct QuadNode {
    QuadHldr wn;
    QuadHldr ws;
    QuadNode ();
+   void del (QuadNode* tQN = nullptr, char tind = 0,
+             QuadNode* pQN = nullptr, char ind = 0);
 };
 struct Qn2 
 {
@@ -173,6 +177,7 @@ struct Qn2
 struct NdNPrn {
    QuadHldr* qh;
    QuadNode* prn;
+   Direction d;
 };
 
 #endif /* WSSERVER_H */
