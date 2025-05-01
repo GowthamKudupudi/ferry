@@ -1127,19 +1127,33 @@ QuadNode::QuadNode () {
 // }
 
 uint QuadHldr::addThis (Direction d, vector<NdNPrn>& pts,
-                        vector<NdNPrn>* apts, QuadNode* pQN, uint initsz) {
-   NdNPrn n = {this, pQN, {(char)-d.x,(char)-d.y}};
+                        vector<NdNPrn>* apts, QuadNode* pQN, char ind,
+                        int initsz) {
+   NdNPrn n = {this, pQN, d, ind};
    bool there = false;
-   for (int i=apts->size()-1; i>=initsz; --i) {
-      if ((*apts)[i].qh == this) {
-         there=true;
-         break;
+   for (int i=apts->size()-1; i>=0&&i>=initsz; --i) {
+      NdNPrn& nd = (*apts)[i];
+      if (nd.qh == this) {
+         if (!((d.x!=0 && nd.d.x==-d.x) || (d.y!=0 && nd.d.y==-d.y))) {
+            return 2+i;
+         } else {
+            apts->push_back(n);
+            return 1;
+         }
       }
    }
    if (!there) {
       apts->push_back(n);
       if (this->fp) {
          pts.push_back(n);
+         // FFJSON* resqp = (FFJSON*)get<0>(bpxor(fp, pQN));
+         // set<void*>::iterator qit = qpset.find(resqp);
+         // bool isQ=qit != qpset.end();
+         // if (!isQ)
+         //    printf("f: %p:%s\n",resqp,(*resqp)["location"].stringify().c_str());
+         // else
+         //    printf("f: %p\n",resqp);
+         // fflush(stdout);
       }
    }
    return 1;
@@ -1149,7 +1163,7 @@ uint QuadHldr::addChildrenOnEdge (Direction d, vector<NdNPrn>& pts,
                                   vector<NdNPrn>* apts, QuadNode* pQN,
                                   char ind, uint initsz) {
    if (!qp || qp==pQN) {
-      return addThis(d, pts, apts, pQN, initsz);
+      return addThis({(char)-d.x,(char)-d.y}, pts, apts, pQN, ind, initsz);
    }
    QuadNode* resqp = (QuadNode*)get<0>(bpxor(fp, pQN));
    set<void*>::iterator qit = qpset.find(resqp);
@@ -1158,56 +1172,61 @@ uint QuadHldr::addChildrenOnEdge (Direction d, vector<NdNPrn>& pts,
       initsz=apts->size();
    }
    if (!isQ) {
-      return addThis(d, pts, apts, pQN, initsz);
+      return addThis({(char)-d.x,(char)-d.y}, pts, apts, pQN, ind, initsz);
    }
    uint c = 0;
    uchar lind=0;
    QuadHldr* qh = &resqp->en;
-   QuadNode* pQN2;
+   QuadNode* tQN;
    set<void*>::iterator it = qpset.upper_bound(this-4);
-   pQN2=(QuadNode*)*it;
-   char x = 0;
-   char y = 0;
-   char *f, *ff;
-   char *n, *nn;
+   tQN=(QuadNode*)*it;
+   uchar tind = this-(QuadHldr*)tQN;
+   char ix;
+   char iy;
+   vector<uchar> vind;
    if (d.x!=0) {
-      n = &y; nn=&d.y;
-      f = &x; ff=&d.x;
-   } else {
-      n = &x; nn=&d.x;
-      f = &y; ff=&d.y;
-   }
-   char j;
-   if (*nn!=0) {
-      j=1;
-      if (*nn>0) {
-         *n=0;
+      ix=d.x==1?0:1;
+      if (d.y!=0) {
+         iy=d.y==1?0:1;
+         lind=ix<<1|iy;
+         vind.push_back(lind);
       } else {
-         *n=1;
+         iy=0;
+         lind=ix<<1|iy;
+         vind.push_back(lind);
+         iy=1;
+         lind=ix<<1|iy;
+         vind.push_back(lind);
       }
    } else {
-      j=2;
-      *n=0;
+      ix=0;
+      iy=d.y==1?0:1;
+      lind=ix<<1|iy;
+      vind.push_back(lind);
+      ix=1;
+      lind=ix<<1|iy;
+      vind.push_back(lind);
    }
-   for (*n=*nn>0?0:1; *n<j; *n+=1) {
-      lind=y|x<<1;
-      QuadHldr* lqh = qh+lind;
-      uint cc = lqh->addChildrenOnEdge(d, pts, apts, pQN2, lind, initsz);
-      if (cc==0) {
-         *f=~*f;
-         ind = y|x<<1;
-         lqh = qh+ind;
-         cc = lqh->addChildrenOnEdge(d, pts, apts, pQN2, lind, initsz);
-         *f=~*f;
+   for (int i=0;i<vind.size();++i) {
+      lind = vind[i];
+      qh = (QuadHldr*)resqp+lind;
+      if (qh->fp) {
+         QuadNode* resqp = (QuadNode*)get<0>(bpxor(qh->fp, tQN));
+         set<void*>::iterator qit = qpset.find(resqp);
+         bool isQ = qit!=qpset.end();
+         if (isQ) {
+            c+=qh->addChildrenOnEdge(d, pts, apts, tQN, tind, initsz);
+            continue;
+         }
       }
-      c+=cc;
+      qh->addThis({(char)-d.x,(char)-d.y}, pts, apts, tQN, tind, initsz);
+      ++c;
    }
    return c;
 }
 
 uint QuadHldr::findNeighbours (vector<NdNPrn>& pts, uint max,
-                                QuadNode* pQN, char ind, Direction d,
-                               bool notChild, vector<NdNPrn>* apts) {
+                               QuadNode* pQN, char ind, Direction d, vector<NdNPrn>* apts, bool notChild) {
    short sign=1;
    short minus=-1;
    uint ni=pts.size();
@@ -1234,38 +1253,30 @@ uint QuadHldr::findNeighbours (vector<NdNPrn>& pts, uint max,
          QuadHldr* pQH = &pQN->en+ind;
          auto tuppqh = bpxor(pQH->fp, tQH);
          QuadNode* ppQN = (QuadNode*)get<0>(tuppqh);
-         printf("fn:ppQN:%p\n", ppQN);
+         //printf("fn:ppQN:%p\n", ppQN);
          lind=get<1>(tuppqh);
          uint ptscnt = pQH->findNeighbours(
             pts, max, (QuadNode*)ppQN, lind,
-            {(rx>1||rx<0)?d.x:(char)0,(ry>1||ry<0)?d.y:(char)0}, true, apts);
+            {(rx>1||rx<0)?d.x:(char)0,(ry>1||ry<0)?d.y:(char)0}, apts, true);
          if (ptscnt) {
-            NdNPrn ndprn = pts.back();
+            uint ptind = ptscnt>=2?(ptscnt-2):apts->size()-1;
+            NdNPrn ndprn = (*apts)[ptind];
             tuppqh = getNode(ndprn);
             QuadHldr* presqp = (QuadHldr*)get<0>(tuppqh);
             set<void*>::iterator qit = qpset.find(presqp);
             bool isQ=qit != qpset.end();
             char iix, iiy, lind, pind;
-            if (!isQ || (QuadNode*)presqp==ndprn.prn) {
-               bool there = false;
-               int i=pts.size()-2;
-               for (; i>=0; --i) {
-                  if (pts[i].qh == ndprn.qh) {
-                     there=true;
-                     break;
+            if (!isQ || ndprn.qh->fp==nullptr) {
+               if (!notChild) {
+                  if (d.x!=0 && d.y!=0) {
+                     (*apts)[ptind].d=d;
                   }
+                  return 1;
                }
-               if (there) {
-                  pts.pop_back();
-                  if (!notChild) {
-                     pts[i].d=d;
-                  }
-               } else {
-                  pts[pts.size()-1].d=d;
-               }
-               return 1;
+               return ptscnt;
             }
             pts.pop_back();
+            apts->pop_back();
             iix = d.x==1?1:(d.x==0?ix:0);
             iiy = d.y==1?1:(d.y==0?iy:0);
             lind = iiy|iix<<1;
@@ -1274,11 +1285,8 @@ uint QuadHldr::findNeighbours (vector<NdNPrn>& pts, uint max,
             ppQN = (QuadNode*)*it;
             pind = ndprn.qh-(QuadHldr*)*it;
             if (notChild) {
-               if (presqp->fp) {
-                  pts.push_back({presqp,(QuadNode*)*it});
-               }
-               apts->push_back({presqp,(QuadNode*)*it});
-               ncnt=1;
+               ncnt =
+                  presqp->addThis(d,pts,apts,(QuadNode*)*it,pind,apts->size()-8);
             } else {
                ncnt+=presqp->addChildrenOnEdge(
                   {(char)-d.x, (char)-d.y}, pts, apts, ppQN, pind);
@@ -1287,11 +1295,7 @@ uint QuadHldr::findNeighbours (vector<NdNPrn>& pts, uint max,
       } else {
          tQH+=lind;
          if (notChild) {
-            if (tQH->fp) {
-               pts.push_back({tQH,pQN,d});
-            }
-            apts->push_back({tQH, pQN, d});
-            ncnt=1;
+            ncnt=tQH->addThis(d,pts,apts,pQN,ind,apts->size()-8);
          } else {
             ncnt += tQH->addChildrenOnEdge({(char)-d.x, (char)-d.y},
                                            pts, apts, pQN, ind);
@@ -1314,20 +1318,19 @@ uint QuadHldr::findNeighbours (vector<NdNPrn>& pts, uint max,
             ncnt+=findNeighbours(pts, max, pQN, ind, d, apts);
          }
       }
-      while (apts->size()-ni>0 && (!max || ncnt<max)) {
-         NdNPrn nd = pts[ni];
-         auto aa = getNode(nd);
-         ncnt+=pts[ni].qh->findNeighbours(
-            pts, max, pts[ni].prn, get<1>(aa), pts[ni].d, apts);
-         if (pts[ni].d.x!=0 && pts[ni].d.y!=0) {
-            Direction dd = pts[ni].d;
+      while (apts->size()-ni>0 && (!max || pts.size()<max)) {
+         NdNPrn nd = (*apts)[ni];
+         ncnt+=nd.qh->findNeighbours(
+            pts, max, nd.prn, nd.ind, nd.d, apts);
+         if (nd.d.x!=0 && nd.d.y!=0) {
+            Direction dd = nd.d;
             dd.x = 0;
-            ncnt+=pts[ni].qh->findNeighbours(
-               pts, max, pts[ni].prn, get<1>(aa), pts[ni].d, apts);
-            dd.x = pts[ni].d.x;
+            ncnt+=nd.qh->findNeighbours(
+               pts, max, nd.prn, nd.ind, dd, apts);
+            dd.x = nd.d.x;
             dd.y=0;
-            ncnt+=pts[ni].qh->findNeighbours(
-               pts, max, pts[ni].prn, get<1>(aa), pts[ni].d, apts);
+            ncnt+=nd.qh->findNeighbours(
+               pts, max, nd.prn, nd.ind, dd, apts);
          }
          ++ni;
       }
@@ -1735,8 +1738,8 @@ uint QuadHldr::getPointsFromQuad (
       } else {
          x=pQH->x;y=pQH->y;
       }
-      printf("%f,%f\n", x, y);
-      fflush(stdout);
+      //printf("%f,%f\n", x, y);
+      //fflush(stdout);
       float dx = 180/(pow(2,level+1));
       float dy = 90/(pow(2,level+1));
       float ddx = 180/(pow(2,level+2));
@@ -1761,7 +1764,7 @@ uint QuadHldr::getPointsFromQuad (
       if (pseudo) {
          nqn = new QuadNode();
          qh = (QuadHldr*)nqn;
-         printf("cqh: %p\n", qh);
+         //printf("cqh: %p\n", qh);
       }
       for (lind=0;lind<4; ++lind, ++qh, xsign*=ysign, ysign*=minus) {
          cxsign=xsign;cysign=ysign;
@@ -1780,7 +1783,7 @@ uint QuadHldr::getPointsFromQuad (
       ptqh.y=cy;
       if (!qh->fp) {
          nqh = cqh = new QuadHldr();
-         printf("cqh: %p\n", cqh);         
+         //printf("cqh: %p\n", cqh);         
          FFJSON* tmp = new FFJSON();
          (*tmp)["location"][0]=c.x;
          (*tmp)["location"][1]=c.y;
@@ -1863,7 +1866,7 @@ uint QuadHldr::getPointsFromQuad (
                wqn.ind=wqn.pqh.ind=lind;
                qcqh.push_back(wqn);
                ++count;
-               printf("nbr: %f,%f\n", nx, ny);
+               //printf("nbr: %f,%f\n", nx, ny);
                //qh->print(c, qn, xind, pqn, lind);
                dist = pow(c.x-nx,2)+pow(c.y-ny,2);
                if (dist<nearest) {
@@ -1946,7 +1949,7 @@ uint QuadHldr::getPointsFromQuad (
             wqn.pqh.ind=tind;
             wqn.ind=lind;
             qcqh.push_back(wqn);
-            printf("inbr: %f,%f\n", nx, ny);
+            //printf("inbr: %f,%f\n", nx, ny);
             dist = pow(c.x-nx,2)+pow(c.y-ny,2);
             if (dist<nearest) {
                nearest=dist;
@@ -1986,7 +1989,7 @@ uint QuadHldr::getPointsFromQuad (
                wqn.ind=lind;
                wqn.pqh.ind=tind;
                qcqh.push_back(wqn);
-               printf("inbr: %f,%f\n", nx, ny);
+               //printf("inbr: %f,%f\n", nx, ny);
                dist = pow(c.x-nx,2)+pow(c.y-ny,2);
                if (dist<nearest) {
                   nearest=dist;
@@ -2052,8 +2055,8 @@ void makeThngsTree () {
          uint level=qh.insert((*tit->val.fptr));
          Circle c;
          c.nf=(FFJSON*)1;
-         qh.print(c);
-         printf ("insertLevel: %u\n", level);
+         //qh.print(c);
+         //printf ("insertLevel: %u\n", level);
          ++tit;
       }
       ++it;
@@ -2100,7 +2103,14 @@ WSServer::WSServer (
    printf("c: %f,%f\n", c.x, c.y);
    CompareByDistanceToCenter comp(c.x, c.y);
    vector<NdNPrn> pts;
+   FerryTimeStamp ftsStart;
+   FerryTimeStamp ftsEnd;
+   FerryTimeStamp ftsDiff;
+   ftsStart.Update();
    thnsTreeMap["PTMN"].getPointsFromQuad(pts, c);
+   ftsEnd.Update();
+   ftsDiff = ftsEnd - ftsStart;
+   cout << "%TEST_FINISHED% time=" << ftsDiff << " test21\n" << endl;
    std::vector<NdNPrn>::iterator it = pts.begin();
    it = pts.begin();
    while (it!=pts.end()) {

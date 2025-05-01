@@ -131,13 +131,13 @@ union QuadHldr {
    // uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
    //                            QuadNode* pQN);
    uint findNeighbours (vector<NdNPrn>& pts, uint max=0,
-                        QuadNode* pQN=nullptr, char ind=0, Direction d = {0},
-                        bool notChild = false, vector<NdNPrn>* apts = nullptr);
+                        QuadNode* pQN=nullptr, char ind=0, Direction d = {0}, vector<NdNPrn>* apts = nullptr,
+                        bool notChild = false);
    uint addChildrenOnEdge (Direction d, vector<NdNPrn>& pts,
                            vector<NdNPrn>* apts, QuadNode* pQN,
                            char ind, uint initsz = 0);
    uint addThis (Direction d, vector<NdNPrn>& pts, vector<NdNPrn>* apts,
-                 QuadNode* pQN, uint initsz = 0);
+                 QuadNode* pQN, char ind = 0, int initsz = 0);
    void print (Circle& c, uint level = 0, QuadNode* tQN = nullptr,
                char tind = 0, QuadNode* pQN = nullptr, char ind = 0);
    void del (QuadNode* tQN = nullptr, char tind = 0,
@@ -182,6 +182,7 @@ struct NdNPrn {
    QuadHldr* qh;
    QuadNode* prn;
    Direction d;
+   char ind;
 };
 
 #endif /* WSSERVER_H */
