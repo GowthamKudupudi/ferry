@@ -73,6 +73,28 @@ bool sendMail = false;
 const uint thnsPrSrch = 25;
 map<string,QuadHldr> thnsTreeMap;
 Metaphone3Encoder m3e;
+template<typename T, typename U>
+void* fpxor (T* a, U* b, char ind) {
+   size_t t = (size_t)(((size_t)a xor (size_t)b));
+   char* c = (char*)&t;
+   if (c[7]!=0) {
+      printf("error: msbs are not equal\n");
+   }
+   c[7]=ind;
+   return (void*)t;
+}
+
+template<typename T, typename U>
+tuple<void*, char> bpxor (T* a, U* b) {
+   char n = ((char*)&a)[7];
+   ((char*)&a)[7]=0;
+   void* m = (void*)(((size_t)a) xor (size_t)b);
+   return tuple<void*, char>{m, n};
+}
+
+tuple<void*,char> getNode (NdNPrn n) {
+   return bpxor(n.qh->qp, n.prn);
+}
 
 static void parseHTTPHeader (const char* uri, size_t len,
                              FFJSON& sessionData) {
@@ -316,7 +338,7 @@ void tls_ntls_common (
             }
             reply["bid"]=bid;
             FFJSON::Iterator tit = things.begin();
-            std::set<FFJSON*, CompareByDistanceToCenter>::iterator atit;
+            //std::set<FFJSON*, CompareByDistanceToCenter>::iterator atit;
             Circle C = {12.91, 77.61, 0.5};
             if (!inmsg["geoposition"].isType(FFJSON::UNDEFINED) &&
                 inmsg["geoposition"].size==2
@@ -325,22 +347,23 @@ void tls_ntls_common (
                C.y=(float)inmsg["geoposition"][1];
                rbs[bid]["geoposition"] = inmsg["geoposition"];
             }
-            CompareByDistanceToCenter comp(C.x, C.y);
-            std::set<FFJSON*, CompareByDistanceToCenter> pts(comp);
-            // while (tit != things.end()) {
-            //    string thing = tit.getIndex();
-            //    thnsTreeMap[thing].getPointsFromRadius(pts, C);
-            //    ++tit;
-            // }
-            atit = pts.begin();
+            //CompareByDistanceToCenter comp(C.x, C.y);
+            //std::set<FFJSON*, CompareByDistanceToCenter> pts(comp);
+            vector<NdNPrn> pts;
+            while (tit != things.end()) {
+               string thing = tit.getIndex();
+               thnsTreeMap[thing].getPointsFromQuad(pts, C);
+               ++tit;
+            }
+            //atit = pts.begin();
             int k=reply["things"].size;
-            while (atit != pts.end()) {
-               ccp un = (**atit)["user"]["name"];
+            for (uint i = 0; i<pts.size(); ++i) {
+               FFJSON& f = *(FFJSON*)get<0>(getNode(pts[i]));
+               ccp un = f["user"]["name"];
                if (!username || strcmp(un,username)) {
-                  reply["things"][k]=*(*atit);
+                  reply["things"][k]=f;
                   ++k;
                }
-               ++atit;
             }
             mg_http_reply(c, 200, headers, "%s",
                           reply.stringify(true).c_str());
@@ -568,17 +591,15 @@ void tls_ntls_common (
             C.y=(float)body["geoposition"][1];
             rbs[bid]["geoposition"] = body["geoposition"];
          }
-         CompareByDistanceToCenter comp(C.x, C.y);
+         //CompareByDistanceToCenter comp(C.x, C.y);
          map<FFJSON*, uint> score;
          for (int k=0;k<vtit.size();++k) {
-            set<FFJSON*, CompareByDistanceToCenter> pts(comp);
-//            vtit[k]->second.getPointsFromRadius(pts, C);
-            set<FFJSON*, CompareByDistanceToCenter>::iterator it =
-               pts.begin();
-            while (it!=pts.end()) {
-               uint& s= score[*it];
+            vector<NdNPrn> pts;
+            vtit[k]->second.getPointsFromQuad(pts, C);
+            for (uint i=0; i<pts.size(); ++i) {
+               FFJSON* f = (FFJSON*)get<0>(getNode(pts[i]));
+               uint& s= score[f];
                ++s;
-               ++it;
             }
          }
          list<pair<FFJSON*, uint>> vp;
@@ -853,27 +874,6 @@ void fn_tls (
 set<void*> qpset;
 set<void*> setffset;
 
-template<typename T, typename U>
-void* fpxor (T* a, U* b, char ind) {
-   size_t t = (size_t)(((size_t)a xor (size_t)b));
-   char* c = (char*)&t;
-   if (c[7]!=0) {
-      printf("error: msbs are not equal\n");
-   }
-   c[7]=ind;
-   return (void*)t;
-}
-
-template<typename T, typename U>
-tuple<void*, char> bpxor (T* a, U* b) {
-   char n = ((char*)&a)[7];
-   ((char*)&a)[7]=0;
-   void* m = (void*)(((size_t)a) xor (size_t)b);
-   return tuple<void*, char>{m, n};
-}
-tuple<void*,char> getNode (NdNPrn n) {
-   return bpxor(n.qh->qp, n.prn);
-}
 uint QuadHldr::insert (FFJSON& rF, bool deleteLeaf, uint level, float x,
                        float y, QuadNode* tQN, char tind,
                        QuadNode* pQN, char ind) {
@@ -887,19 +887,26 @@ uint QuadHldr::insert (FFJSON& rF, bool deleteLeaf, uint level, float x,
    set<FFJSON*>* ressfp = (set<FFJSON*>*)resfp;
    set<void*>::iterator qit = qpset.find(resfp);
    set<void*>::iterator sit = setffset.find(resfp);
-   bool isQ=qit != qpset.end();
+   bool isQ = qit != qpset.end();
    if (!isQ) {
       bool isS=sit != setffset.end();
       if (deleteLeaf) {
          if (!isS && resfp == (void*)&rF) {
             fp=(FFJSON*)pQN;
-            return level;
+            return 1;
          } else {
             set<FFJSON*>::iterator it = ressfp->find(&rF);
             if (it!=ressfp->end()) {
                ressfp->erase(it);
             }
+            if (!ressfp->size()) {
+               delete ressfp;
+               return 1;
+            } else {
+               return 0;
+            }
          }
+         return 0;
       }
       if (resfp == (void*)&rF)
          return level;
@@ -944,19 +951,20 @@ uint QuadHldr::insert (FFJSON& rF, bool deleteLeaf, uint level, float x,
       float dy = 90/(pow(2,level+1));
       FFJSON* pxorrf = (FFJSON*)fpxor(&rF,tQN,tind);
       QuadNode* qpres = (QuadNode*)resfp;
+      uint returnv=0;
       if ((double)rF["location"][0] >= x) {
          if ((double)rF["location"][1] >= y) {
             if (qpres->en.fp==nullptr) {
                qpres->en.fp=pxorrf;
             } else {
-               return qpres->en.insert(
+               returnv = qpres->en.insert(
                   rF,deleteLeaf, level+1, x+dx, y+dy, qpres, 0, tQN, tind);
             }
          } else {
             if (qpres->es.fp==nullptr) {
                qpres->es.fp=pxorrf;
             } else {
-               return qpres->es.insert(
+               returnv = qpres->es.insert(
                   rF,deleteLeaf, level+1, x+dx, y-dy, qpres, 1, tQN, tind);
             }
          }
@@ -965,17 +973,32 @@ uint QuadHldr::insert (FFJSON& rF, bool deleteLeaf, uint level, float x,
             if (qpres->wn.fp==nullptr) {
                qpres->wn.fp=pxorrf;
             } else {
-               return qpres->wn.insert(
+               returnv = qpres->wn.insert(
                   rF, deleteLeaf, level+1, x-dx, y+dy, qpres, 2, tQN, tind);
             }
          } else {
             if (qpres->ws.fp==nullptr) {
                qpres->ws.fp=pxorrf;
             } else {
-               return qpres->ws.insert(
+               returnv = qpres->ws.insert(
                   rF, deleteLeaf, level+1, x-dx, y-dy, qpres, 3, tQN, tind);
             }
          }
+      }
+      if (deleteLeaf) {
+         if (returnv) {
+            QuadHldr* qh = &qpres->en;
+            char inx = 0;
+            for (;inx<4;++inx,++qh) {
+               if (qh->fp!=nullptr) {
+                  return 0;
+               }
+            }
+            delete qpres;
+            qp=nullptr;
+            return 1;
+         }
+         return 0;
       }
       //printf("rF: %p,%s:%p:%p inserted\n", &rF,
       //       rF["location"].stringify().c_str(),
@@ -2098,7 +2121,7 @@ WSServer::WSServer (
           malloc_usable_size(fp), sizeof(*fp));
    
    makeThngsTree();
-   Circle c = {0.174, 0.27, 10.5};
+   Circle c = {0.85, 0.55, 10.5};
    //Circle c = {13.004896,77.753464, 10.5};
    printf("c: %f,%f\n", c.x, c.y);
    CompareByDistanceToCenter comp(c.x, c.y);
