@@ -115,13 +115,14 @@ union QuadHldr {
    QuadNode* qp;
    FFJSON* fp;
    set<FFJSON*>* sp;
+   QuadNode* qn ();
    uint insert (
-      FFJSON& rF, bool deleteLeaf = false, uint level = 0,
+      FFJSON& rF, uint namei, bool deleteLeaf = false, uint level = 0,
       float x = 0.0, float y = 0.0, QuadNode* tQN = nullptr, char tind=0,
       QuadNode* pQN = nullptr, char ind=0
    );
    uint getPointsFromQuad (
-      vector<NdNPrn>& pts, Circle& c,
+      vector<uint>& ina, vector<NdNPrn>& pts, Circle& c,
       uint minPts = 20, uint level=0, float x=0, float y=0,
       QuadNode* tQN=nullptr, char tind=0, QuadNode* pQN=nullptr, char ind=0
    );
@@ -131,18 +132,18 @@ union QuadHldr {
    // );
    // uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
    //                            QuadNode* pQN);
-   uint findNeighbours (vector<NdNPrn>& pts, uint max=0,
+   uint findNeighbours (vector<uint>& ina, vector<NdNPrn>& pts, uint max=0,
                         QuadNode* tQN=nullptr, char tind=0,
                         QuadNode* pQN=nullptr, char ind=0, Direction d = {0}, bool notChild = false);
-   uint addChildrenOnEdge (Direction d, vector<NdNPrn>& pts,
-                           QuadNode* pQN,
+   uint addChildrenOnEdge (vector<uint>& ina, Direction d,
+                           vector<NdNPrn>& pts, QuadNode* pQN,
                            char ind, uint initsz = 0);
    uint addThis (Direction d, vector<NdNPrn>& pts,
                  QuadNode* pQN, char ind = 0, int initsz = 0);
    void print (Circle& c, uint level = 0, QuadNode* tQN = nullptr,
                char tind = 0, QuadNode* pQN = nullptr, char ind = 0);
-   void del (QuadNode* tQN = nullptr, char tind = 0,
-             QuadNode* pQN = nullptr, char ind = 0);
+   // void del (QuadNode* tQN = nullptr, char tind = 0,
+   //           QuadNode* pQN = nullptr, char ind = 0);
 };
 
 struct CompareByDistanceToCenter {
@@ -171,6 +172,8 @@ struct QuadNode {
    QuadNode ();
    void del (QuadNode* tQN = nullptr, char tind = 0,
              QuadNode* pQN = nullptr, char ind = 0);
+   void seti (uint namei);
+   uint hasName (vector<uint>& ina);
 };
 struct Qn2 
 {
