@@ -690,14 +690,14 @@ void tls_ntls_common (
                   FFJSON& uloc = uthings[j]["location"];
                   if ((double)cloc[0]!=(double)uloc[0] ||
                       (double)cloc[1]!=(double)uloc[1] || nameChanged) {
-                     thnsTree.insert(uthings[j], un.vu[0], true);
+                     thnsTree.insert(uthings[j], un.vu, true);
                      locChanged=true;
                   }
                }
                uthings[j]=cthings[i];
                UintName cn=nametouint(cname);
                if (locChanged || nameChanged) {
-                  thnsTree.insert(uthings[j], cn.vu[0]);
+                  thnsTree.insert(uthings[j], cn.vu);
                }
                for (int k=0; k<cn.mwd.size(); ++k) {
                   FFJSON& ln = things[cn.mwd[k]][].addLink(
@@ -861,9 +861,9 @@ void fn_tls (
 //set<void*> qpset;
 vector<map<QuadNode*, uint>> qpmapvec;
 set<void*> setffset;
-void QuadNode::seti (uint namei) {
+void QuadNode::seti (vector<uint>& namei) {
    uint& lni = qpmapvec[0][this];
-   lni |= 1<<(namei+1);
+   lni |= 1<<(namei[0]+1);
 }
 map<QuadNode*,uint>::iterator qpfind (QuadNode* qp) {
    return qpmapvec[0].find(qp);
@@ -890,9 +890,55 @@ uint ffHasName (FFJSON& ff, vector<uint>& ina) {
    return countSetBits(ina[0] & un.vu[0]);
 }
 
+vector<uint> QuadHldr::getIntNames (QuadNode* tQN, char tind,
+                                    QuadNode* pQN, char ind) {
+   vector<uint> r;
+   if (!fp) {
+      return r;
+   }
+   QuadNode* resfp = (QuadNode*)get<0>(bpxor(fp, pQN));
+   uint a=0;
+   for (uint i=0; i<qpmapvec.size(); ++i) {
+      map<QuadNode*, uint>::iterator it = qpmapvec[i].find(resfp);
+      if (it!=qpmapvec[i].end()) {
+         r.push_back(it->second);
+         a|=it->second;
+      } else {
+         r.push_back(0);
+      }
+   }
+   if (!a) {
+      r=nametouint((*(FFJSON*)resfp)["name"]).vu;
+   }
+   return r;
+}
 
-uint QuadHldr::insert (FFJSON& rF, uint namei, bool deleteLeaf, uint level,
-                       float x, float y, QuadNode* tQN, char tind,
+void QuadNode::updateIntNames (QuadNode* tQN, char tind,
+                               QuadNode* pQN, char ind) {
+   QuadHldr* qh = (QuadHldr*)this;
+   vector<uint> r;
+   for (char i=0;i<4;++i,++qh) {
+      vector<uint> lr = qh->getIntNames(tQN, tind, pQN, ind);
+      for (char j=0;j<lr.size();++j) {
+         if (j==lr.size()) {
+            r.push_back(0);
+         }
+         uint& ui = r[j];
+         ui|=lr[j];
+      }
+   }
+   seti(r);
+}
+
+QuadNode::~QuadNode () {
+   map<QuadNode*,uint>::iterator qit = qpmapvec[0].find(this);
+   if (qit!=qpmapvec[0].end()) {
+      qpmapvec[0].erase(qit);
+   }
+}
+
+uint QuadHldr::insert (FFJSON& rF, vector<uint>& ina, bool deleteLeaf,
+                       uint level, float x, float y, QuadNode* tQN, char tind,
                        QuadNode* pQN, char ind) {
    //printf("x,y: %lf,%lf\n", x, y);
    if (fp==nullptr || (void*)fp==pQN) {
@@ -909,7 +955,7 @@ uint QuadHldr::insert (FFJSON& rF, uint namei, bool deleteLeaf, uint level,
       bool isS=sit != setffset.end();
       if (deleteLeaf) {
          if (!isS && resfp == (void*)&rF) {
-            fp=(FFJSON*)pQN;
+            fp=nullptr;
             return 1;
          } else {
             set<FFJSON*>::iterator it = ressfp->find(&rF);
@@ -918,6 +964,7 @@ uint QuadHldr::insert (FFJSON& rF, uint namei, bool deleteLeaf, uint level,
             }
             if (!ressfp->size()) {
                delete ressfp;
+               fp=nullptr;
                return 1;
             } else {
                return 0;
@@ -961,63 +1008,55 @@ uint QuadHldr::insert (FFJSON& rF, uint namei, bool deleteLeaf, uint level,
       }
       //printf("qp: %p, tQN: %p\n", qp, tQN);
       qp = (QuadNode*)fpxor(qp,pQN,ind);
-      return insert(rF,namei,deleteLeaf,level,x, y, tQN, tind, pQN, ind);
+      return insert(rF,ina,deleteLeaf,level,x, y, tQN, tind, pQN, ind);
    } else {
       float dx = 180/(pow(2,level+1));
       float dy = 90/(pow(2,level+1));
       FFJSON* pxorrf = (FFJSON*)fpxor(&rF,tQN,tind);
       QuadNode* qpres = (QuadNode*)resfp;
+      QuadHldr* qh = (QuadHldr*)qpres;
       uint returnv=0;
-      qpres->seti(namei);
-      if ((double)rF["location"][0] >= x) {
-         if ((double)rF["location"][1] >= y) {
-            if (qpres->en.fp==nullptr) {
-               qpres->en.fp=pxorrf;
-            } else {
-               returnv = qpres->en.insert(
-                  rF, namei, deleteLeaf, level+1, x+dx, y+dy, qpres, 0, tQN,
-                  tind);
-            }
-         } else {
-            if (qpres->es.fp==nullptr) {
-               qpres->es.fp=pxorrf;
-            } else {
-               returnv = qpres->es.insert(
-                  rF, namei, deleteLeaf, level+1, x+dx, y-dy, qpres, 1, tQN,
-                  tind);
-            }
-         }
+      qpres->seti(ina);
+      char ind = (double)rF["location"][0] >= x?0:1;
+      char xs=ind==0?1:-1;
+      ind<<=1;
+      char ys = (double)rF["location"][1] >= y?1:-1;
+      ind |= ys>=0?0:1;
+      qh+=ind;
+      if (qpres->en.fp==nullptr) {
+               qh->fp=pxorrf;
       } else {
-         if ((double)rF["location"][1] >= y) {
-            if (qpres->wn.fp==nullptr) {
-               qpres->wn.fp=pxorrf;
-            } else {
-               returnv = qpres->wn.insert(
-                  rF, namei, deleteLeaf, level+1, x-dx, y+dy, qpres, 2, tQN,
-                  tind);
-            }
-         } else {
-            if (qpres->ws.fp==nullptr) {
-               qpres->ws.fp=pxorrf;
-            } else {
-               returnv = qpres->ws.insert(
-                  rF, namei, deleteLeaf, level+1, x-dx, y-dy, qpres, 3, tQN,
-                  tind);
-            }
-         }
+         returnv = qh->insert(
+            rF, ina, deleteLeaf, level+1, x+xs*dx, y+ys*dy, qpres, 0, tQN, tind);
       }
       if (deleteLeaf) {
          if (returnv) {
-            QuadHldr* qh = &qpres->en;
-            char inx = 0;
-            for (;inx<4;++inx,++qh) {
-               if (qh->fp!=nullptr) {
-                  return 0;
+            qh = (QuadHldr*)qpres;
+            if (returnv>1) {
+               qh = &qpres->en;
+               ind = 0;
+               xs=0;
+               for (;ind<4;++ind,++qh) {
+                  if (qh->fp!=nullptr) {
+                     ++xs;
+                     pxorrf=(FFJSON*)qh;
+                     if (xs>1) {
+                        return 1;
+                     }
+                  }
+               }
+               if (xs) {
+                  qh=(QuadHldr*)pxorrf;
+                  pxorrf=(FFJSON*)get<0>(bpxor(qh->fp, tQN));
+                  delete resfp;
+                  qp = (QuadNode*)fpxor(pxorrf, pQN,ind);
+               } else {
+                  delete qpres;
+                  qp=nullptr;
+                  return 2;
                }
             }
-            delete qpres;
-            qp=nullptr;
-            return 1;
+            qpres->updateIntNames(tQN,tind,pQN,ind);
          }
          return 0;
       }
@@ -1369,19 +1408,19 @@ void makeThngsTree () {
    fthings=things.val.pairs;
    FFJSON::Iterator it = things.begin();
    FFJSON::Iterator tit;
-   int i=0;
    while (it!= things.end()) {
       string thing = it.getIndex();
       tit = it->begin();
       while (tit!=it->end()) {
-         uint level=thnsTree.insert((*tit->val.fptr), i);
+         UintName un = nametouint((*tit->val.fptr)["name"]);
+         uint level=thnsTree.insert((*tit->val.fptr), un.vu);
          Circle c;
          c.nf=(FFJSON*)1;
          //qh.print(c);
          //printf ("insertLevel: %u\n", level);
          ++tit;
       }
-      ++it;++i;
+      ++it;
    }
 }
 

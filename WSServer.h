@@ -117,7 +117,7 @@ union QuadHldr {
    set<FFJSON*>* sp;
    QuadNode* qn ();
    uint insert (
-      FFJSON& rF, uint namei, bool deleteLeaf = false, uint level = 0,
+      FFJSON& rF, vector<uint>& ina, bool deleteLeaf = false, uint level = 0,
       float x = 0.0, float y = 0.0, QuadNode* tQN = nullptr, char tind=0,
       QuadNode* pQN = nullptr, char ind=0
    );
@@ -142,6 +142,8 @@ union QuadHldr {
                  QuadNode* pQN, char ind = 0, int initsz = 0);
    void print (Circle& c, uint level = 0, QuadNode* tQN = nullptr,
                char tind = 0, QuadNode* pQN = nullptr, char ind = 0);
+   vector<uint> getIntNames (QuadNode* tQN=nullptr, char tind=0,
+                             QuadNode* pQN=nullptr, char ind=0); 
    // void del (QuadNode* tQN = nullptr, char tind = 0,
    //           QuadNode* pQN = nullptr, char ind = 0);
 };
@@ -172,9 +174,13 @@ struct QuadNode {
    QuadNode ();
    void del (QuadNode* tQN = nullptr, char tind = 0,
              QuadNode* pQN = nullptr, char ind = 0);
-   void seti (uint namei);
+   void seti (vector<uint>& ina);
    uint hasName (vector<uint>& ina);
+   void updateIntNames (QuadNode* tQN = nullptr, char tind = 0,
+                        QuadNode* pQN = nullptr, char ind = 0);
+   ~QuadNode ();
 };
+
 struct Qn2 
 {
    QuadNode* p1;
