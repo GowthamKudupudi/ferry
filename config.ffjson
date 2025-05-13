@@ -47,7 +47,7 @@
          "users": file:///home/Necktwi/workspace/WWW-development/users.ffjson,
          "rbs": file:///home/Necktwi/workspace/WWW-development/rbs.ffjson,
          "config": file:///home/Necktwi/workspace/WWW-development/config.ffjson,
-         "things": file:///home/Necktwi/workspace/WWW-development/things.ffjson
+         "nameints": file:///home/Necktwi/workspace/WWW-development/nameints.ffjson
 		},
       "127.0.0.2": underconstruction,
       "192.168.0.4": underconstruction,

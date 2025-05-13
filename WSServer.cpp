@@ -73,7 +73,7 @@ bool sendMail = false;
 const uint thnsPrSrch = 25;
 QuadHldr thnsTree;
 Metaphone3Encoder m3e;
-map<string,FFJSON*>* fthings = nullptr;
+map<string, FFJSON*>* nameints;
 
 struct UintName {
    vector<uint> vu;
@@ -87,13 +87,13 @@ UintName nametouint (string name, bool jstCount = false) {
    for (int k=0;k<un.mwd.size();++k) {
       string mwd = m3e.encode(un.mwd[k]).first;
       un.mwd[k]=mwd;
-      map<string,FFJSON*>::iterator it=fthings->find(mwd);
-      if (it==fthings->end())
+      map<string,FFJSON*>::iterator it=nameints->find(mwd);
+      if (it==nameints->end())
          continue;
       if (jstCount) {
          ++bitCode;
       } else {
-         int d = distance(fthings->begin(), it);
+         int d = distance(nameints->begin(), it);
          bitCode|=1<<d;
       }
    }
@@ -320,7 +320,6 @@ void tls_ntls_common (
          config["virtualWebHosts"][subdomain]:config;
       FFJSON& rbs=vhost["rbs"];
       FFJSON& users=vhost["users"];
-      FFJSON& things=vhost["things"];
       if (vhost["rootdir"])
          opts.root_dir=(ccp)vhost["rootdir"];
       if (sessionData["cookie"])get_cookies(sessionData["cookie"], cookie);
@@ -363,7 +362,7 @@ void tls_ntls_common (
             rbs[bid]["ip"]=c->rem.ip;
            gotbid:
             if ((uint32_t)rbs[bid]["ip"]!=c->rem.ip) {
-               goto newbid;
+              goto newbid;
             }
             rbs[bid]["ts"]=chrono::high_resolution_clock::now();
             FFJSON reply;
@@ -372,8 +371,6 @@ void tls_ntls_common (
                reply = users[(ccp)rbs[bid]["user"]];
             }
             reply["bid"]=bid;
-            FFJSON::Iterator tit = things.begin();
-            //std::set<FFJSON*, CompareByDistanceToCenter>::iterator atit;
             Circle C = {12.91, 77.61, 0.5};
             if (!inmsg["geoposition"].isType(FFJSON::UNDEFINED) &&
                 inmsg["geoposition"].size==2
@@ -682,9 +679,9 @@ void tls_ntls_common (
                   vector<string>& uwds = un.mwd;
                   if (strcmp(cname.c_str(),uname.c_str())) {
                      for (int k=0; k<uwds.size(); ++k) {
-                        things[uwds[k]].erase(&uthings[j]);
-                        nameChanged=true;
+                        --(*nameints)[uwds[k]]->val.number;
                      }
+                     nameChanged=true;
                   }
                   FFJSON& cloc = cthings[i]["location"];
                   FFJSON& uloc = uthings[j]["location"];
@@ -696,14 +693,13 @@ void tls_ntls_common (
                }
                uthings[j]=cthings[i];
                UintName cn=nametouint(cname);
-               if (locChanged || nameChanged) {
+               if (locChanged) {
                   thnsTree.insert(uthings[j], cn.vu);
                }
-               for (int k=0; k<cn.mwd.size(); ++k) {
-                  FFJSON& ln = things[cn.mwd[k]][].addLink(
-                     vhost, string("users.")+username+".things."+to_string(j));
-                  if (!ln)
-                     delete &ln;
+               if (nameChanged) {
+                  for (int k=0; k<cn.mwd.size(); ++k) {
+                     ++(*nameints)[cn.mwd[k]]->val.number;
+                  }
                }
             }
          }
@@ -861,18 +857,37 @@ void fn_tls (
 //set<void*> qpset;
 vector<map<QuadNode*, uint>> qpmapvec;
 set<void*> setffset;
-void QuadNode::seti (vector<uint>& namei) {
-   uint& lni = qpmapvec[0][this];
-   lni |= 1<<(namei[0]+1);
+void QuadNode::seti (vector<uint>& ina) {
+   for (int i=0; i<ina.size();++i) {
+      if (ina[i]!=0) {
+         uint& lni = qpmapvec[i][this];
+         lni |= ina[i];
+      }
+   }
 }
 map<QuadNode*,uint>::iterator qpfind (QuadNode* qp) {
-   return qpmapvec[0].find(qp);
+   map<QuadNode*, uint>::iterator it;
+   for (int i=0; i<qpmapvec.size();++i) {
+      it = qpmapvec[i].find(qp);
+      if (it!=qpmapvec[i].end()) {
+         return it;
+      }
+   }
+   return it;
 }
+
 bool isQuad (map<QuadNode*,uint>::iterator it) {
-   return qpmapvec[0].end()==it;
+   return qpmapvec[0].end()!=it;
 }
 QuadNode* QuadHldr::qn () {
-   return qpmapvec[0].upper_bound((QuadNode*)(this-4))->first;
+   QuadNode* r=nullptr;
+   for (int i=0; i<qpmapvec.size(); ++i) {
+      r = qpmapvec[i].upper_bound((QuadNode*)(this-4))->first;
+      if (this-(QuadHldr*)r <4) {
+         return r;
+      }
+   }
+   return r;
 }
 uint QuadNode::hasName (vector<uint>& ina) {
    if (!ina.size()) {
@@ -991,6 +1006,7 @@ uint QuadHldr::insert (FFJSON& rF, vector<uint>& ina, bool deleteLeaf,
       }
       FFJSON& tmp = *tfp;
       qp = new QuadNode();
+      qp->seti(ina);
       FFJSON* xorfp = (FFJSON*)fpxor(resfp,tQN,tind);
       //printf("%p,%p\n", resfp, xorfp);
       if ((double)tmp["location"][0] >= x) {
@@ -1017,26 +1033,26 @@ uint QuadHldr::insert (FFJSON& rF, vector<uint>& ina, bool deleteLeaf,
       QuadHldr* qh = (QuadHldr*)qpres;
       uint returnv=0;
       qpres->seti(ina);
-      char ind = (double)rF["location"][0] >= x?0:1;
-      char xs=ind==0?1:-1;
-      ind<<=1;
+      char qind = (double)rF["location"][0] >= x?0:1;
+      char xs=qind==0?1:-1;
+      qind<<=1;
       char ys = (double)rF["location"][1] >= y?1:-1;
-      ind |= ys>=0?0:1;
-      qh+=ind;
-      if (qpres->en.fp==nullptr) {
-               qh->fp=pxorrf;
+      qind |= ys>=0?0:1;
+      qh+=qind;
+      if (qh->fp==nullptr) {
+         qh->fp=pxorrf;
       } else {
          returnv = qh->insert(
-            rF, ina, deleteLeaf, level+1, x+xs*dx, y+ys*dy, qpres, 0, tQN, tind);
+            rF, ina, deleteLeaf, level+1, x+xs*dx, y+ys*dy, qpres, qind, tQN, tind);
       }
       if (deleteLeaf) {
          if (returnv) {
             qh = (QuadHldr*)qpres;
             if (returnv>1) {
                qh = &qpres->en;
-               ind = 0;
+               qind = 0;
                xs=0;
-               for (;ind<4;++ind,++qh) {
+               for (;qind<4;++qind,++qh) {
                   if (qh->fp!=nullptr) {
                      ++xs;
                      pxorrf=(FFJSON*)qh;
@@ -1238,7 +1254,7 @@ uint QuadHldr::findNeighbours (vector<uint>& ina, vector<NdNPrn>& pts,
             return 0;
          }
          QuadHldr* pQH = &pQN->en+ind;
-         auto tuppqh = bpxor(pQH->fp, tQH);
+         auto tuppqh = bpxor(pQH->fp, tQN);
          QuadNode* ppQN = (QuadNode*)get<0>(tuppqh);
          if (!ppQN->hasName(ina)) {
             return 0;
@@ -1404,20 +1420,29 @@ char Direction::abs () {
 }
 void makeThngsTree () {
    QuadNode q;
-   FFJSON& things = config["virtualWebHosts"]["underconstruction"]["things"];
-   fthings=things.val.pairs;
-   FFJSON::Iterator it = things.begin();
+   qpmapvec.push_back(map<QuadNode*, uint>());
+   nameints =
+      config["virtualWebHosts"]["underconstruction"]["nameints"].val.pairs;
+   
+   FFJSON& users = config["virtualWebHosts"]["underconstruction"]["users"];
+   FFJSON::Iterator it = users.begin();
    FFJSON::Iterator tit;
-   while (it!= things.end()) {
-      string thing = it.getIndex();
-      tit = it->begin();
-      while (tit!=it->end()) {
-         UintName un = nametouint((*tit->val.fptr)["name"]);
-         uint level=thnsTree.insert((*tit->val.fptr), un.vu);
-         Circle c;
-         c.nf=(FFJSON*)1;
-         //qh.print(c);
-         //printf ("insertLevel: %u\n", level);
+   while (it!= users.end()) {
+      if (it->isType(FFJSON::LINK)) {
+         ++it;
+         continue;
+      }
+      string user = it.getIndex();
+      FFJSON& uthings = (*it)["things"];
+      tit = uthings.begin();
+      while (tit!=uthings.end()) {
+         UintName un = nametouint((ccp)(*tit)["name"]);
+         uint level=thnsTree.insert((*tit), un.vu);
+         // Circle c;
+         // c.nf=(FFJSON*)1;
+         // printf("%s\n", (*tit)["location"].stringify().c_str());
+         // thnsTree.print(c);
+         // printf ("insertLevel: %u\n", level);
          ++tit;
       }
       ++it;
@@ -1459,7 +1484,8 @@ WSServer::WSServer (
    //        malloc_usable_size(fp), sizeof(*fp));
    
    makeThngsTree();
-   Circle c = {180.0, 90.0, 10.5};
+   //Circle c = {180.0, 90.0, 10.5};
+   Circle c = {0.1, 0.1, 10.5};
    //Circle c = {13.004896,77.753464, 10.5};
    printf("c: %f,%f\n", c.x, c.y);
    CompareByDistanceToCenter comp(c.x, c.y);
