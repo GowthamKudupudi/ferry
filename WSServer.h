@@ -119,7 +119,7 @@ union QuadHldr {
    uint insert (
       FFJSON& rF, vector<uint>& ina, bool deleteLeaf = false, uint level = 0,
       float x = 0.0, float y = 0.0, QuadNode* tQN = nullptr, char tind=0,
-      QuadNode* pQN = nullptr, char ind=0
+      QuadNode* pQN = nullptr, char ind=0, char sn = 0
    );
    uint getPointsFromQuad (
       vector<uint>& ina, vector<NdNPrn>& pts, Circle& c,
@@ -175,7 +175,7 @@ struct QuadNode {
    void del (QuadNode* tQN = nullptr, char tind = 0,
              QuadNode* pQN = nullptr, char ind = 0);
    void seti (vector<uint>& ina);
-   uint hasName (vector<uint>& ina);
+   uint hasName (vector<uint>& ina, vector<map<QuadNode*,uint>::iterator> vit);
    void updateIntNames (QuadNode* tQN = nullptr, char tind = 0,
                         QuadNode* pQN = nullptr, char ind = 0);
    ~QuadNode ();
