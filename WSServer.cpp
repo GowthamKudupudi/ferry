@@ -54,7 +54,7 @@ typedef const char* ccp;
 using namespace std;
 using namespace std::placeholders;
 
-enum { EHLO, STARTTLS, STARTTLS_WAIT, AUTH, FROM, TO, DATA, BODY, QUIT, END };
+enum {EHLO, STARTTLS, STARTTLS_WAIT, AUTH, FROM, TO, DATA, BODY, QUIT, END};
 
 struct mg_mgr mgr, mail_mgr;
 
@@ -74,11 +74,19 @@ const uint thnsPrSrch = 25;
 QuadHldr thnsTree;
 Metaphone3Encoder m3e;
 map<string, FFJSON*>* nameints;
+FFJSON* fnameints=nullptr;
 
 struct UintName {
    vector<uint> vu;
    vector<string> mwd;
 };
+struct CompNameWt {
+   bool operator () (const map<string, FFJSON*>::iterator it1,
+                     const map<string, FFJSON*>::iterator it2) const {
+      return (double)it1->second->val.number < (double)it2->second->val.number;
+   }
+} cmpNmWt;
+map<const string*, uint> mitpos;
 
 UintName nametouint (string name, bool jstCount = false) {
    UintName un;
@@ -87,13 +95,13 @@ UintName nametouint (string name, bool jstCount = false) {
    for (int k=0;k<un.mwd.size();++k) {
       string mwd = m3e.encode(un.mwd[k]).first;
       un.mwd[k]=mwd;
-      map<string,FFJSON*>::iterator it=nameints->find(mwd);
+      map<string,FFJSON*>::iterator it = nameints->find(mwd);
       if (it==nameints->end())
          continue;
       if (jstCount) {
          ++bitCode;
       } else {
-         int d = distance(nameints->begin(), it);
+         int d = (int)mitpos[&it->first];
          div_t bi = div(d,(8*sizeof(uint)));
          for (int i=un.vu.size();i<=bi.quot;++i) {
             un.vu.push_back(0);
@@ -226,12 +234,11 @@ void get_cookies (const char* c, FFJSON& fc) {
 }
 
 struct CompThingNameMatch {
-   bool operator () (const tuple<FFJSON*,uint>& t1,
-                     const tuple<FFJSON*,uint>& t2) const {
+   bool operator () (const tuple<FFJSON*,char>& t1,
+                     const tuple<FFJSON*,char>& t2) const {
       return (get<1>(t1) < get<1>(t2));
    }
 };
-   
 void mailfn (
    struct mg_connection *c, int ev, void *ev_data, void *fn_data
 ) {
@@ -296,6 +303,45 @@ void mailfn (
    (void) fn_data, (void) ev_data;
 }
 
+bool isValidThingName (FFJSON& tname) {
+   if (tname.isType(FFJSON::STRING) && tname.size<=64) {
+      ccp ctname = tname;
+      for (uint i=0; i<tname.size; ++i) {
+         char c = ctname[i];
+         if (!((c>='a' && c<='z') || (c>='A' && c<='Z') || (c>='0' && c<='9')
+               || (c=='-' || c==' ' || c=='.'))) {
+            return false;
+         }
+      }
+   }
+   return true;
+}
+
+bool isValidThingDetails (FFJSON& tname) {
+   if (tname.isType(FFJSON::STRING) && tname.size<=256) {
+      ccp ctname = tname;
+      for (uint i=0; i<tname.size; ++i) {
+         char c = ctname[i];
+         if (!((c>=' ' && c<='~') || c=='\n')) {
+            return false;
+         }
+      }
+      if (strstr(ctname, "<script")) {
+         return false;
+      }
+   }
+   return true;
+}
+
+bool isValidLocation (FFJSON& cloc) {
+   if (cloc.isType(FFJSON::ARRAY) && cloc.size==2) {
+      if (cloc[0].isType(FFJSON::NUMBER) && cloc[1].isType(FFJSON::NUMBER)) {
+         return true;
+      }
+   }
+   return false;
+}
+
 void tls_ntls_common (
    struct mg_connection* c, int ev, void* ev_data, void* fn_data
 ) {
@@ -353,59 +399,53 @@ void tls_ntls_common (
          //cookie
          ffl_notice(FPL_HTTPSERV, "cookie");
          FFJSON inmsg(string(hm->body.ptr, hm->body.len));
-         if (!inmsg["bid"].isType(FFJSON::UNDEFINED)) {
-            if (strcmp(inmsg["bid"],"undefined") || inmsg["bid"]) {
-               bid=(ccp)inmsg["bid"];
-               if(rbs[bid])
-                  goto gotbid;
-            }
-           newbid:
-            bid = random_alphnuma_string();
-           bidcheck:
-            if (rbs[bid]) {
-               bid=random_alphnuma_string();
-               goto bidcheck;
-            }
-            rbs[bid]["ip"]=c->rem.ip;
-           gotbid:
-            if ((uint32_t)rbs[bid]["ip"]!=c->rem.ip) {
-              goto newbid;
-            }
-            rbs[bid]["ts"]=chrono::high_resolution_clock::now();
-            FFJSON reply;
-            username = rbs[bid]["user"];
-            if (username) {
-               reply = users[(ccp)rbs[bid]["user"]];
-            }
-            reply["bid"]=bid;
-            Circle C = {12.91, 77.61, 0.5};
-            if (!inmsg["geoposition"].isType(FFJSON::UNDEFINED) &&
-                inmsg["geoposition"].size==2
-            ) {
-               C.x=(float)inmsg["geoposition"][0];
-               C.y=(float)inmsg["geoposition"][1];
-               rbs[bid]["geoposition"] = inmsg["geoposition"];
-            }
-            //CompareByDistanceToCenter comp(C.x, C.y);
-            //std::set<FFJSON*, CompareByDistanceToCenter> pts(comp);
-            vector<NdNPrn> pts;
-            vector<uint> ina;
-            thnsTree.getPointsFromQuad(ina, pts, C);
-            int k=reply["things"].size;
-            for (uint i = 0; i<pts.size(); ++i) {
-               FFJSON& f = *(FFJSON*)get<0>(getNode(pts[i]));
-               ccp un = f["user"]["name"];
-               if (!username || strcmp(un,username)) {
-                  reply["things"][k]=f;
-                  ++k;
-               }
-            }
-            mg_http_reply(c, 200, headers, "%s",
-                          reply.stringify(true).c_str());
-            rbs.save();
-         } else {
-            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
+         if (bid.length())
+            if(rbs[bid])
+               goto gotbid;
+        newbid:
+         bid = random_alphnuma_string();
+        bidcheck:
+         if (rbs[bid]) {
+            bid=random_alphnuma_string();
+            goto bidcheck;
          }
+         rbs[bid]["ip"]=c->rem.ip;
+        gotbid:
+         if ((uint32_t)rbs[bid]["ip"]!=c->rem.ip) {
+            goto newbid;
+         }
+         rbs[bid]["ts"]=chrono::high_resolution_clock::now();
+         FFJSON reply;
+         username = rbs[bid]["user"];
+         if (username) {
+            reply = users[(ccp)rbs[bid]["user"]];
+         }
+         reply["bid"]=bid;
+         Circle C = {12.91, 77.61, 0.5};
+         if (!inmsg["geoposition"].isType(FFJSON::UNDEFINED) &&
+             inmsg["geoposition"].size==2
+         ) {
+            C.x=(float)inmsg["geoposition"][0];
+            C.y=(float)inmsg["geoposition"][1];
+            rbs[bid]["geoposition"] = inmsg["geoposition"];
+         }
+         //CompareByDistanceToCenter comp(C.x, C.y);
+         //std::set<FFJSON*, CompareByDistanceToCenter> pts(comp);
+         vector<NdNPrn> pts;
+         vector<uint> ina;
+         thnsTree.getPointsFromQuad(ina, pts, C);
+         int k=reply["things"].size;
+         for (uint i = 0; i<pts.size(); ++i) {
+            FFJSON& f = *(FFJSON*)get<0>(getNode(pts[i]));
+            ccp un = f["user"]["name"];
+            if (!username || strcmp(un,username)) {
+               reply["things"][k]=f;
+               ++k;
+            }
+         }
+         mg_http_reply(c, 200, headers, "%s",
+                       reply.stringify(true).c_str());
+         rbs.save();
       } else if (!strcmp(path, "/login")) {
          //login
          ffl_notice(FPL_HTTPSERV, "Login");
@@ -425,7 +465,7 @@ void tls_ntls_common (
          if (user["password"] && !user["inactive"] &&
              !strcmp(password,user["password"])
          ) {
-            rbs[bid]["user"]=username;
+            rbs[bid]["user"]=user["name"];
             rbs[bid]["ip"]=c->rem.ip;
             user["bid"]=bid;
             mg_http_reply(c, 200, headers, "%s",
@@ -614,14 +654,21 @@ void tls_ntls_common (
             rbs[bid]["geoposition"] = body["geoposition"];
          }
          CompThingNameMatch cTNM;
-         set<tuple<FFJSON*, uint>, CompThingNameMatch> score(cTNM);
+         multiset<tuple<FFJSON*, char>, CompThingNameMatch> score(cTNM);
          vector<NdNPrn> pts;
          thnsTree.getPointsFromQuad(ina,pts,C);
          for (int i=0;i<pts.size();++i) {
-            FFJSON& f = *(FFJSON*)get<0>(getNode(pts[i]));
-            score.insert({&f,nametouint((ccp)f["name"], 1).vu[0]});
+            NdNPrn& nd = pts[i];
+            FFJSON* f;
+            if (nd.prn==(QuadNode*)-1) {
+               f = (FFJSON*)nd.qh;
+            } else {
+               auto aa = getNode(nd);
+               f = (FFJSON*)get<0>(aa);
+            }
+            score.insert({f,nd.d.x});
          }
-         set<tuple<FFJSON*, uint>, CompThingNameMatch>::iterator it=
+         multiset<tuple<FFJSON*, char>, CompThingNameMatch>::iterator it=
             score.begin();
          while (it!=score.end()) {
             reply["things"][k]=*(get<0>(*it));
@@ -669,17 +716,25 @@ void tls_ntls_common (
                }
                bool locChanged = false;
                bool nameChanged = false;
+               if (!isValidThingName(cthings[i]["name"])) {
+                  mg_http_reply(c, 400, headers, "{%Q:%Q}",
+                                "error", "invalidThingName");
+                  goto done;
+               }
                string cname((ccp)cthings[i]["name"]);
                cthings[i].erase("user");
                if (!uthings[j]) {
-                  cthings[i]["id"] = uthings.size?
+                  uthings[i]["id"] = uthings.size?
                      ((int)uthings[j-1]["id"]) + 1 : 0;
                   FFJSON& ln = uthings[j]["user"].addLink(users, username);
                   if (!ln)
                      delete &ln;
                   nameChanged=true;
+                  if (cthings[i]["location"]) {
+                     locChanged=true;
+                  }
                } else {
-                  string uname((ccp)uthings[j]["name"]);
+                  string uname(uthings[j]["name"]?(ccp)uthings[j]["name"]:"");
                   strLower(cname);
                   strLower(uname);
                   UintName un=nametouint(uname);
@@ -688,25 +743,51 @@ void tls_ntls_common (
                      for (int k=0; k<uwds.size(); ++k) {
                         --(*nameints)[uwds[k]]->val.number;
                      }
-                     nameChanged=true;
+                     nameChanged=true;locChanged=true;
                   }
                   FFJSON& cloc = cthings[i]["location"];
                   FFJSON& uloc = uthings[j]["location"];
+                  if (!isValidLocation(cloc)) {
+                     mg_http_reply(c, 400, headers, "{%Q:%Q}",
+                                "error", "invalidLocation");
+                     goto done;
+                  }
                   if ((double)cloc[0]!=(double)uloc[0] ||
-                      (double)cloc[1]!=(double)uloc[1] || nameChanged) {
+                      (double)cloc[1]!=(double)uloc[1]) {
                      thnsTree.insert(uthings[j], un.vu, true);
                      locChanged=true;
                   }
                }
-               uthings[j]=cthings[i];
-               UintName cn=nametouint(cname);
-               if (locChanged) {
-                  thnsTree.insert(uthings[j], cn.vu);
+               uthings[j]["name"]=cthings[i]["name"];
+               uthings[j]["location"]=cthings[i]["location"];
+               if (cthings[i]["details"]) {
+                  if (isValidThingDetails(cthings[i]["details"])) {
+                     uthings[j]["details"]=cthings[j]["details"];
+                  } else {
+                     mg_http_reply(c, 400, headers, "{%Q:%Q}",
+                                "error", "invalidThingDetails");
+                     goto done;
+                  }
                }
                if (nameChanged) {
+                  UintName cn=nametouint(cname,1);
                   for (int k=0; k<cn.mwd.size(); ++k) {
-                     ++(*nameints)[cn.mwd[k]]->val.number;
+                     map<string, FFJSON*>::iterator it =
+                        nameints->find(cn.mwd[k]);
+                     if (it==nameints->end()) {
+                        (*fnameints)[cn.mwd[k]]=1;
+                        it=nameints->find(cn.mwd[k]);
+                        mitpos[&it->first]=nameints->size()-1;
+                     } else {
+                        ++(*nameints)[cn.mwd[k]]->val.number;
+                     }
                   }
+               }
+               if (locChanged) {
+                  UintName cn = nametouint(cname);
+                  thnsTree.insert(uthings[j], cn.vu);
+                  Circle c;
+                  thnsTree.print(c);
                }
             }
          }
@@ -798,6 +879,9 @@ void tls_ntls_common (
          if (fofst==0) {
             FFJSON& uts = user["things"];
             uts[thngi]["id"]=thingId;
+            if (!uts[thngi]["user"]) {
+               uts[thngi]["user"].addLink(users, username);
+            }
             FFJSON& ups = uts[thngi]["pics"];
             ups[picId]["partial"] = true;
             if (fofst+chnkSz<ttlSz) {
@@ -1000,7 +1084,7 @@ uint QuadHldr::insert (FFJSON& rF, vector<uint>& ina, bool deleteLeaf,
          if (!isS && resfp == (void*)&rF) {
             fp=nullptr;
             return 1;
-         } else {
+         } else if (isS) {
             set<FFJSON*>::iterator it = ressfp->find(&rF);
             if (it!=ressfp->end()) {
                ressfp->erase(it);
@@ -1149,16 +1233,20 @@ void QuadHldr::print (Circle& c, uint level, QuadNode* tQN, char tind,
       return;
    }
    QuadNode* resqp = (QuadNode*)get<0>(bpxor(fp,pQN));
-   set<void*>::iterator sit = setffset.find(resqp);
-   bool isS = sit != setffset.end();
    vector<map<QuadNode*,uint>::iterator> qit = qpfind((QuadNode*)resqp);
    if (!qit.size()) {
+      set<void*>::iterator sit = setffset.find(resqp);
+      bool isS=sit != setffset.end();
+      if (isS) {
+         vector<FFJSON*>& vf = *(vector<FFJSON*>*)*sit;
+         resqp=(QuadNode*)vf[0];
+      }
       FFJSON& f = *(FFJSON*)resqp;
       if (c.nf!=(FFJSON*)1)
          c.grabIfNearest(f);
-      printf("%.*s%d: %p%s\n",level,
+      printf("%.*s%d: %p(%d)%s\n",level,
              "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||",
-             tind, &f, f["location"].stringify().c_str());
+             tind, &f, isS, f["location"].stringify().c_str());
    } else {
       QuadHldr* qh = (QuadHldr*)resqp;
       printf("%.*s%d: %p\n", level,"|||||||||||||||||||||||||||||||||||||||||",
@@ -1380,9 +1468,31 @@ uint QuadHldr::findNeighbours (vector<uint>& ina, vector<NdNPrn>& pts,
             QuadNode* resqp = (QuadNode*)get<0>(getNode(nd));
             vector<map<QuadNode*,uint>::iterator> qit =
                qpfind((QuadNode*)resqp);
-            if (!qit.size() && ffHasName((*(FFJSON*)resqp), ina)) {
-               pts[pni] = pts[ni];
-               ++pni;
+            if (!qit.size()) {
+               set<void*>::iterator sit = setffset.find(resqp);
+               bool isS=sit != setffset.end();
+               if (isS) {
+                  vector<FFJSON*>& vf = *(vector<FFJSON*>*)*sit;
+                  for (int i=0; i<vf.size(); ++i) {
+                     char matchcount = (char)ffHasName(*vf[i], ina);
+                     if (matchcount) {
+                        pts[pni] = {(QuadHldr*)vf[i],
+                           (QuadNode*)-1,{matchcount,0},0};
+                        ++pni;
+                        if (pni>ni) {
+                           pts.insert(pts.begin()+pni,vf.size()-i-1,{0});
+                           ni+=vf.size()-i-2;
+                        }
+                     }
+                  }
+               } else {
+                  char matchcount = (char)ffHasName((*(FFJSON*)resqp), ina);
+                  if (matchcount) {
+                     pts[pni] = pts[ni];
+                     pts[pni].d.x = matchcount;
+                     ++pni;
+                  }
+               }
             }
          }
          ++ni;
@@ -1428,8 +1538,20 @@ uint QuadHldr::getPointsFromQuad (
    }
    void* resfp = get<0>(bpxor(fp,pQN));
    vector<map<QuadNode*,uint>::iterator> qit = qpfind((QuadNode*)resfp);
-   if (!(qit.size() && ((QuadNode*)resfp)->hasName(ina,qit))) {
-      pts.push_back({this,pQN});
+   if (!(qit.size())) {
+      set<void*>::iterator sit = setffset.find(resfp);
+      bool isS=sit != setffset.end();
+      if (isS) {
+         vector<FFJSON*>& vf = *(vector<FFJSON*>*)*sit;
+         for (int i=0; i<vf.size(); ++i) {
+            if (ffHasName(*vf[i], ina)) {
+               pts.push_back({this,pQN});
+               break;
+            }
+         }
+      } else if (ffHasName(*(FFJSON*)resfp,ina)) {
+         pts.push_back({this,pQN});
+      }
       return findNeighbours(ina, pts, minPts, tQN, tind, pQN, ind);
    } else {
       QuadNode* resqp = (QuadNode*)resfp;
@@ -1461,9 +1583,23 @@ char Direction::abs () {
 void makeThngsTree () {
    QuadNode q;
    qpmapvec.push_back(map<QuadNode*, uint>());
-   nameints =
-      config["virtualWebHosts"]["underconstruction"]["nameints"].val.pairs;
-   
+   fnameints =
+      &config["virtualWebHosts"]["underconstruction"]["nameints"];
+   nameints = fnameints->val.pairs;
+   map<string, FFJSON*>::iterator nit = nameints->begin();
+   multiset<map<string, FFJSON*>::iterator, CompNameWt> namewtset(cmpNmWt);
+   while (nit!=nameints->end()) {
+      namewtset.insert(nit);
+      ++nit;
+   }
+   uint i=0;
+   multiset<map<string, FFJSON*>::iterator, CompNameWt>::iterator mit
+      = namewtset.begin();
+   while (mit!=namewtset.end()) {
+      mitpos[&((*mit)->first)]=i;
+      ++i;
+      ++mit;
+   }
    FFJSON& users = config["virtualWebHosts"]["underconstruction"]["users"];
    FFJSON::Iterator it = users.begin();
    FFJSON::Iterator tit;
@@ -1476,8 +1612,11 @@ void makeThngsTree () {
       FFJSON& uthings = (*it)["things"];
       tit = uthings.begin();
       while (tit!=uthings.end()) {
-         UintName un = nametouint((ccp)(*tit)["name"]);
-         uint level=thnsTree.insert((*tit), un.vu);
+         if (!((*tit)["name"].isType(FFJSON::UNDEFINED) ||
+               (*tit)["location"].isType(FFJSON::UNDEFINED))) {
+            UintName un = nametouint((ccp)(*tit)["name"]);
+            uint level=thnsTree.insert((*tit), un.vu);
+         }
          // Circle c;
          // c.nf=(FFJSON*)1;
          // printf("%s\n", (*tit)["location"].stringify().c_str());
