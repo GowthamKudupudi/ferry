@@ -107,6 +107,13 @@ struct Direction {
    char y;
    char abs ();
 };
+struct Pts {
+   Circle c;
+   vector<NdNPrn> pts;
+   vector<uint> ina;
+   uint ni;
+   uint minPts;
+}
 struct CompareByDistanceToCenter;
 union QuadHldr {
    QuadHldr () {
@@ -122,8 +129,7 @@ union QuadHldr {
       QuadNode* pQN = nullptr, char ind=0, char sn = 0
    );
    uint getPointsFromQuad (
-      vector<uint>& ina, vector<NdNPrn>& pts, Circle& c,
-      uint minPts = 20, uint level=0, float x=0, float y=0,
+      Pts& pts, uint level=0, float x=0, float y=0,
       QuadNode* tQN=nullptr, char tind=0, QuadNode* pQN=nullptr, char ind=0
    );
    // uint getPointsFromRadius (
@@ -132,11 +138,10 @@ union QuadHldr {
    // );
    // uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
    //                            QuadNode* pQN);
-   uint findNeighbours (vector<uint>& ina, vector<NdNPrn>& pts, uint max=0,
+   uint findNeighbours (Pts& pts,
                         QuadNode* tQN=nullptr, char tind=0,
                         QuadNode* pQN=nullptr, char ind=0, Direction d = {0}, bool notChild = false);
-   uint addChildrenOnEdge (vector<uint>& ina, Direction d,
-                           vector<NdNPrn>& pts, QuadNode* pQN,
+   uint addChildrenOnEdge (Pts& pts, QuadNode* pQN,
                            char ind, uint initsz = 0);
    uint addThis (Direction d, vector<NdNPrn>& pts,
                  QuadNode* pQN, char ind = 0, int initsz = 0);
@@ -193,6 +198,7 @@ struct NdNPrn {
    QuadNode* prn;
    Direction d;
    char ind;
+   void print () const;
 };
-
+void printpts (const vector<NdNPrn>& pts);
 #endif /* WSSERVER_H */
