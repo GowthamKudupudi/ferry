@@ -100,20 +100,29 @@ struct WholeQuadNode {
    char ind;
    QuadHldr* qh;
 };
-struct NdNPrn;
-typedef unsigned uchar;
 struct Direction {
    char x;
    char y;
    char abs ();
 };
+struct NdNPrn {
+   QuadHldr* qh;
+   QuadNode* prn;
+   Direction d;
+   char ind;
+   int width = 0;
+   void print () const;
+};
+typedef unsigned uchar;
 struct Pts {
    Circle c;
    vector<NdNPrn> pts;
    vector<uint> ina;
-   uint ni;
+   int ni=-1;
+   int nni=-1;
    uint minPts;
-}
+   Pts () : c({0}),ni(0),minPts(0) {}
+};
 struct CompareByDistanceToCenter;
 union QuadHldr {
    QuadHldr () {
@@ -138,13 +147,13 @@ union QuadHldr {
    // );
    // uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
    //                            QuadNode* pQN);
-   uint findNeighbours (Pts& pts,
-                        QuadNode* tQN=nullptr, char tind=0,
-                        QuadNode* pQN=nullptr, char ind=0, Direction d = {0}, bool notChild = false);
-   uint addChildrenOnEdge (Pts& pts, QuadNode* pQN,
-                           char ind, uint initsz = 0);
-   uint addThis (Direction d, vector<NdNPrn>& pts,
-                 QuadNode* pQN, char ind = 0, int initsz = 0);
+   uint findNeighbours (Pts& pts, QuadNode* tQN=nullptr, char tind=0,
+                        QuadNode* pQN=nullptr, char ind=0, int level=0,
+                        Direction d = {0}, bool notChild = false);
+   uint addChildrenOnEdge (Pts& pts, Direction d, QuadNode* pQN,
+                           char ind, int level);
+   uint addThis (Pts& pts, Direction d, int level,
+                 QuadNode* pQN, char ind = 0);
    void print (Circle& c, uint level = 0, QuadNode* tQN = nullptr,
                char tind = 0, QuadNode* pQN = nullptr, char ind = 0);
    vector<uint> getIntNames (QuadNode* tQN=nullptr, char tind=0,
@@ -192,13 +201,6 @@ struct Qn2
    QuadNode* p2;
    QuadNode* p3;
    QuadNode* p4;
-};
-struct NdNPrn {
-   QuadHldr* qh;
-   QuadNode* prn;
-   Direction d;
-   char ind;
-   void print () const;
 };
 void printpts (const vector<NdNPrn>& pts);
 #endif /* WSSERVER_H */
