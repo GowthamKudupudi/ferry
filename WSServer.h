@@ -106,22 +106,22 @@ struct Direction {
    char abs ();
 };
 struct NdNPrn {
-   QuadHldr* qh;
+   QuadHldr* qh=nullptr;
    QuadNode* prn;
+   float dx = 0.0;
+   float ds = 0.0;
    Direction d;
    char ind;
-   int width = 0;
    void print () const;
 };
 typedef unsigned uchar;
 struct Pts {
-   Circle c;
+   Circle c = {0};
    vector<NdNPrn> pts;
    vector<uint> ina;
    int ni=-1;
    int nni=-1;
-   uint minPts;
-   Pts () : c({0}),ni(0),minPts(0) {}
+   uint minPts=-1;
 };
 struct CompareByDistanceToCenter;
 union QuadHldr {
@@ -148,12 +148,13 @@ union QuadHldr {
    // uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
    //                            QuadNode* pQN);
    uint findNeighbours (Pts& pts, QuadNode* tQN=nullptr, char tind=0,
-                        QuadNode* pQN=nullptr, char ind=0, int level=0,
-                        Direction d = {0}, bool notChild = false);
+                        QuadNode* pQN=nullptr, char ind=0, float dx =0.0,
+                        float ds=0.0, Direction d = {0},
+                        bool notChild = false);
    uint addChildrenOnEdge (Pts& pts, Direction d, QuadNode* pQN,
-                           char ind, int level);
-   uint addThis (Pts& pts, Direction d, int level,
-                 QuadNode* pQN, char ind = 0);
+                           char ind, float dx, float ds, bool noChk=false);
+   int addThis (Pts& pts, Direction d, float dx, float ds,
+                 QuadNode* pQN, char ind = 0, int noChk = 0);
    void print (Circle& c, uint level = 0, QuadNode* tQN = nullptr,
                char tind = 0, QuadNode* pQN = nullptr, char ind = 0);
    vector<uint> getIntNames (QuadNode* tQN=nullptr, char tind=0,

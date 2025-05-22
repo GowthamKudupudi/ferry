@@ -356,15 +356,15 @@ void quickSort (vector<NdNPrn>& pts, int start, int end) {
    if (end-start<=0) {
       return;
    } else if (end-start==1) {
-      if (pts[start].width>pts[end].width) {
+      if (pts[start].ds>pts[end].ds) {
          ptswap(pts, start, end);
       }
    } else {
-      int cmp = pts[start].width;
+      float cmp = pts[start].ds;
       int lowind=start;
       int picker=start+1;
       while (picker<=end) {
-         if (pts[picker].width<cmp) {
+         if (pts[picker].ds<cmp) {
             ptswap(pts, picker, lowind);
             ++lowind;
          }
@@ -1314,7 +1314,8 @@ void QuadHldr::print (Circle& c, uint level, QuadNode* tQN, char tind,
 
 void NdNPrn::print () const {
    auto aa = getNode(*this);
-   printf ("%p((%d)%p),%d,%d\n", this->qh, this->qh->fp!=nullptr, get<0>(aa), this->d.x, this->d.y);
+   printf ("%p((%d)%p),%d,%d-%f\n", qh, qh->fp!=nullptr, get<0>(aa), d.x,
+           d.y,ds);
    fflush(stdout);
 }
 void printpts (const vector<NdNPrn>& pts) {
@@ -1331,17 +1332,48 @@ QuadNode::QuadNode () {
    ws.fp=nullptr;
 }
 
-uint QuadHldr::addThis (Pts& pts, Direction d, int level,
-                        QuadNode* pQN, char ind) {
-   NdNPrn n = {this, pQN, d, ind, level};
+int QuadHldr::addThis (Pts& pts, Direction d, float dx, float ds,
+                        QuadNode* pQN , char ind, int noChk) {
+   NdNPrn n = {this, pQN, dx, ds, d, ind};
    bool there = false;
-   for (int i=pts.pts.size()-1; i>=0&&i>pts.nni-8; --i) {
-      NdNPrn& nd = pts.pts[i];
-      if (nd.qh == this) {
-         if (!((d.x!=0 && nd.d.x==-d.x) || (d.y!=0 && nd.d.y==-d.y))) {
-            return 2+i;
+   if (noChk==1) {
+      pts.pts.push_back(n);
+      return 1;
+   }
+   for (int i=pts.pts.size()-1; i>pts.ni; --i) {
+      if (pts.pts[i].qh == this) {
+         NdNPrn nd = pts.pts[i];
+         if (noChk==-1 && nd.d.x==d.x and nd.d.y==d.y) {
+            return -1;
+         }
+         NdNPrn nd2;
+         if (pts.pts[i-1].qh == this) {
+            nd2 = pts.pts[i-1];
+         }
+         pts.pts.erase(
+            nd2.qh?pts.pts.begin()+(i-1):pts.pts.begin()+i, pts.pts.begin()+i+1);
+         if ((d.x!=0 && nd.d.x==-d.x) || (d.y!=0 && nd.d.y==-d.y)) {
+            pts.pts.push_back(nd);
+            if (nd2.qh) {
+               pts.pts.push_back(nd2);
+            } else {
+               pts.pts.push_back(n);   
+            }
+            return 1;
+         } else if (nd2.qh && ((d.x!=0 && nd2.d.x==-d.x) ||
+                               (d.y!=0 && nd2.d.y==-d.y))) {
+            pts.pts.push_back(nd2);
+            pts.pts.push_back(n);   
+            return 1;
          } else {
-            pts.pts.push_back(n);
+            if (!nd2.qh && n.d.x!=0&&n.d.y!=0) {
+               nd.d.x=n.d.x;
+               nd.d.y=n.d.y;
+            }
+            if (nd2.qh) {
+               pts.pts.push_back(nd2);
+            }
+            pts.pts.push_back(nd);
             return 1;
          }
       }
@@ -1352,16 +1384,20 @@ uint QuadHldr::addThis (Pts& pts, Direction d, int level,
    return 1;
 }
 
-uint QuadHldr::addChildrenOnEdge (Pts& pts, Direction d, QuadNode* pQN,
-                                  char ind, int level) {
+uint QuadHldr::addChildrenOnEdge (
+   Pts& pts, Direction d, QuadNode* pQN, char ind, float dx, float ds,
+   bool noChk
+) {
    if (!qp) {
-      uint ncnt = addThis(pts, {(char)-d.x,(char)-d.y}, level, pQN, ind);
+      uint ncnt = addThis(pts, {(char)-d.x,(char)-d.y}, dx, ds,
+                          pQN,ind,noChk);
       return ncnt;
    }
    QuadNode* resqp = (QuadNode*)get<0>(bpxor(fp, pQN));
    vector<map<QuadNode*,uint>::iterator> qit = qpfind((QuadNode*)resqp);
    if (!(qit.size() && resqp->hasName(pts.ina,qit))) {
-      uint ncnt = addThis(pts, {(char)-d.x,(char)-d.y}, level, pQN, ind);
+      uint ncnt = addThis(pts, {(char)-d.x,(char)-d.y}, dx, ds,
+                          pQN,ind,noChk);
       return ncnt;
    }
    uint c = 0;
@@ -1406,18 +1442,27 @@ uint QuadHldr::addChildrenOnEdge (Pts& pts, Direction d, QuadNode* pQN,
          vector<map<QuadNode*,uint>::iterator> qit =
             qpfind((QuadNode*)resqp);
          if (qit.size() && resqp->hasName(pts.ina,qit)) {
-            c+=qh->addChildrenOnEdge(pts, d, tQN, tind, level-1);
+            int z = qh->addChildrenOnEdge(pts, d, tQN, tind, dx/2,
+                                          ds-dx/4,-1);
+            if (z==-1) {
+               return -1;
+            }
+            c+=z;
             continue;
          }
       }
-      qh->addThis(pts, {(char)-d.x,(char)-d.y}, level-1, tQN, tind);
+      int z = qh->addThis(pts, {(char)-d.x,(char)-d.y}, dx/2, ds-dx/4, tQN,
+                          tind, -1);
+      if (z==-1) {
+         return -1;
+      }
       ++c;
    }
    pts.nni = nni;
    return c;
 }
 uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, char tind,
-                               QuadNode* pQN, char ind, int level,
+                               QuadNode* pQN, char ind, float dx, float ds,
                                Direction d, bool notChild) {
    if (tQN==nullptr) {
       return 0;
@@ -1453,31 +1498,25 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, char tind,
          //printf("fn:ppQN:%p\n", ppQN);
          lind=get<1>(tuppqh);
          uint ptscnt = pQH->findNeighbours(
-            pts, pQN, ind, (QuadNode*)ppQN, lind, level+1,
+            pts, pQN, ind, (QuadNode*)ppQN, lind, 2*dx, ds,
             {(rx>1||rx<0)?d.x:(char)0,(ry>1||ry<0)?d.y:(char)0}, true);
-         if (ptscnt) {
-            uint ptind = ptscnt>=2?(ptscnt-2):pts.pts.size()-1;
-            NdNPrn ndprn = pts.pts[ptind];
+         if (ptscnt && ptscnt!=-1) {
+            NdNPrn ndprn = pts.pts.back();
+            pts.pts.pop_back();
             tuppqh = getNode(ndprn);
             QuadHldr* presqp = (QuadHldr*)get<0>(tuppqh);
             char iix, iiy, lind, pind;
             qit = qpfind((QuadNode*)presqp);
             if (!(qit.size() && ((QuadNode*)presqp)->hasName(pts.ina,qit)) ||
                ndprn.qh->fp==nullptr) {
-               if (!notChild) {
-                  if (d.x!=0 && d.y!=0) {
-                     if (ndprn.d.x==-d.x || ndprn.d.y==-d.y) {
-                        pts.pts.push_back(pts.pts[ptind]);
-                        pts.pts[pts.pts.size()-1].d=d;
-                     } else {
-                        pts.pts[ptind].d=d;
-                     }
-                  }
+               ndprn.qh->addThis(pts, d, ndprn.dx, ndprn.ds, ndprn.prn,
+                                 ndprn.ind);
+               if (notChild) {
+                  return -1;
+               } else {
                   return 1;
                }
-               return ptscnt;
             }
-            pts.pts.pop_back();
             iix = d.x==1?1:(d.x==0?ix:0);
             iiy = d.y==1?1:(d.y==0?iy:0);
             lind = iiy|iix<<1;
@@ -1486,19 +1525,43 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, char tind,
             pind = ndprn.qh-(QuadHldr*)ppQN;
             if (notChild) {
                ncnt =
-                  presqp->addThis(pts,d,level, ppQN,pind);
+                  presqp->addThis(pts,d, dx, ds+dx/2, ppQN,pind, true);
             } else {
-               ncnt+=presqp->addChildrenOnEdge(
-                  pts, {(char)-d.x, (char)-d.y}, ppQN, pind, level);
+               int z =presqp->addChildrenOnEdge(
+                  pts, {(char)-d.x, (char)-d.y}, ppQN, pind, dx, ds+dx/2);
+               if (z==-1) {
+                  ncnt+=0;
+               }
+            }
+         } else if (ptscnt==-1) {
+            if (d.x!=0 && d.y!=0) {
+               NdNPrn& n = pts.pts[pts.pts.size()-1];
+               if (d.x==-n.d.x || d.y==-n.d.y) {
+                  NdNPrn& n2 = pts.pts[pts.pts.size()-2];
+                  if (n.qh!=n2.qh) {
+                     pts.pts.push_back(n);
+                     n.d=d;
+                  }
+               } else {
+                  n.d=d;
+               }
+            }
+            if (notChild) {
+               return -1;
+            } else {
+               return 1;
             }
          }
       } else {
          tQH+=lind;
          if (notChild) {
-            ncnt=tQH->addThis(pts,d,level,pQN,ind);
+            ncnt=tQH->addThis(pts,d,dx,ds+dx/2,pQN,ind, true);
          } else {
-            ncnt += tQH->addChildrenOnEdge(pts, {(char)-d.x, (char)-d.y},
-                                           pQN, ind, level);
+            int z = tQH->addChildrenOnEdge(pts, {(char)-d.x, (char)-d.y},
+                                           pQN, ind, dx, ds+dx/2);
+            if (z==-1) {
+               ncnt+=0;
+            }
          }
       }
    } else {
@@ -1510,33 +1573,40 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, char tind,
             if (i==0 && j==0)
                continue;
             d.x=i; d.y=j;
-            ncnt+=findNeighbours(pts, tQN, tind, pQN, ind, 0, d);
+            ncnt+=findNeighbours(pts, tQN, tind, pQN, ind, dx, dx/2, d);
          }
       }
       ++pts.ni;
+      //printpts(pts.pts);
       quickSort(pts.pts,pts.ni,pts.pts.size()-1);
+      //printf("---------\n");
+      //printpts(pts.pts);
+      //printf("---------\n");
       uint pni=pts.ni;
       pts.nni = pts.pts.size();
-      while (pts.ni<pts.pts.size() && (!pts.minPts || pni<pts.minPts)) {
+      while (pts.ni<pts.pts.size() && pni<pts.minPts) {
          NdNPrn nd = pts.pts[pts.ni];
          tQN=nd.qh->qn();
          tind=nd.qh-(QuadHldr*)tQN;
+         //pts.nni=pts.pts.size();
          ncnt+=nd.qh->findNeighbours(
-            pts, tQN, tind, nd.prn, nd.ind, nd.width, nd.d);
+            pts, tQN, tind, nd.prn, nd.ind, nd.dx, nd.ds, nd.d);
+         //quickSort(pts.pts, pts.nni, pts.pts.size()-1);
          if (nd.d.x!=0 && nd.d.y!=0) {
             Direction dd = nd.d;
             dd.x = 0;
+            //pts.nni=pts.pts.size();
             ncnt+=nd.qh->findNeighbours(
-               pts, tQN, tind, nd.prn, nd.ind, nd.width, dd);
+               pts, tQN, tind, nd.prn, nd.ind, nd.dx, nd.ds, dd);
+            //quickSort(pts.pts, pts.nni, pts.pts.size()-1);
             dd.x = nd.d.x;
             dd.y=0;
+            //pts.nni=pts.pts.size();
             ncnt+=nd.qh->findNeighbours(
-               pts, tQN, tind, nd.prn, nd.ind, nd.width, dd);
+               pts, tQN, tind, nd.prn, nd.ind, nd.dx, nd.ds, dd);
+            //quickSort(pts.pts, pts.nni, pts.pts.size()-1);
          }
-         if (pts.ni==pts.nni-1 && pts.ni<pts.pts.size()-1)  {
-            quickSort(pts.pts, pts.nni, pts.pts.size()-1);
-            pts.nni=pts.pts.size();
-         }         
+         quickSort(pts.pts, pts.ni+1, pts.pts.size()-1);
          if (nd.qh->fp && pts.ni>pni) {
             QuadNode* resqp = (QuadNode*)get<0>(getNode(nd));
             vector<map<QuadNode*,uint>::iterator> qit =
@@ -1551,7 +1621,7 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, char tind,
                      char matchcount = (char)ffHasName(**sfit, pts.ina);
                      if (matchcount) {
                         pts.pts[pni] = {(QuadHldr*)*sfit,
-                           (QuadNode*)-1,{matchcount,0},0};
+                           (QuadNode*)-1,nd.dx,nd.ds,{matchcount,0},0};
                         ++pni;
                         if (pni>pts.ni) {
                            pts.pts.insert(
@@ -1621,11 +1691,12 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, char tind,
 // }
 
 uint QuadHldr::getPointsFromQuad (
-   Pts& pts, uint level, float x, float y, QuadNode* tQN, char tind,
-   QuadNode* pQN, char ind
+   Pts& pts, uint level, float x, float y, QuadNode* tQN,
+   char tind, QuadNode* pQN, char ind
 ) {
+   float dx = 180/(pow(2,level+1));
    if (fp==nullptr) {
-      return findNeighbours(pts, tQN, tind, pQN, ind);
+      return findNeighbours(pts, tQN, tind, pQN, ind, dx);
    }
    void* resfp = get<0>(bpxor(fp,pQN));
    vector<map<QuadNode*,uint>::iterator> qit = qpfind((QuadNode*)resfp);
@@ -1639,26 +1710,25 @@ uint QuadHldr::getPointsFromQuad (
             char matchcount = (char)ffHasName(**sfit, pts.ina);
             if (matchcount) {
                pts.pts.push_back(
-                  {(QuadHldr*)*sfit,(QuadNode*)-1,{matchcount,0},0});
+                  {(QuadHldr*)*sfit,(QuadNode*)-1,dx,dx,{matchcount,0},0});
             }
             ++sfit;
          }
       } else if (ffHasName(*(FFJSON*)resfp, pts.ina)) {
          pts.pts.push_back({this,pQN});
       }
-      return findNeighbours(pts, tQN, tind, pQN, ind);
+      return findNeighbours(pts, tQN, tind, pQN, ind, dx);
    } else {
       QuadNode* resqp = (QuadNode*)resfp;
       char matchcount = (char)resqp->hasName(pts.ina,qit);
       if (!matchcount) {
-         return findNeighbours(pts, tQN, tind, pQN, ind);
+         return findNeighbours(pts, tQN, tind, pQN, ind, dx);
       }
       QuadHldr* qh = &resqp->en;
       int xsign=1;
       int ysign=1;
       int minus=-1;
       char lind=0;
-      float dx = 180/(pow(2,level+1));
       float dy = 90/(pow(2,level+1));
       for (lind=0;lind<4; ++lind, ++qh, xsign*=ysign, ysign*=minus) {
          if (xsign*pts.c.x>=xsign*x && ysign*pts.c.y>=ysign*y) {
@@ -1764,7 +1834,8 @@ WSServer::WSServer (
    //Circle c = {180.0, 90.0, 10.5};
    //Circle c = {0.1, 0.1, 10.5};
    //Circle c = {0.9, 0.8, 10.5};
-   pts.c = {77.7584640, 12.9826816, 10.5};
+   //pts.c = {77.7584640, 12.9826816, 10.5};
+   pts.c = {77.7617416, 12.9892349, 10.5};
    printf("c: %f,%f\n", pts.c.x, pts.c.y);
    FerryTimeStamp ftsStart;
    FerryTimeStamp ftsEnd;
@@ -1772,7 +1843,6 @@ WSServer::WSServer (
    ftsStart.Update();
    thnsTree.print(pts.c);
    //ina.push_back(0x80);
-   pts.minPts=-1;
    thnsTree.getPointsFromQuad(pts);
    ftsEnd.Update();
    ftsDiff = ftsEnd - ftsStart;
@@ -1789,9 +1859,9 @@ WSServer::WSServer (
       printf("%s\n",(*fp)["location"].stringify().c_str());
       ++it;
    }
-   pts.c.nf=nullptr;
-   thnsTree.print(pts.c);
-   printf("nf: %s\n", (*pts.c.nf)["location"].stringify().c_str());
+   // pts.c.nf=nullptr;
+   // thnsTree.print(pts.c);
+   // printf("nf: %s\n", (*pts.c.nf)["location"].stringify().c_str());
    mg_mgr_init(&mgr);
    mg_mgr_init(&mail_mgr);
    char httpsport[16];
