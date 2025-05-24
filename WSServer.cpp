@@ -843,10 +843,55 @@ void tls_ntls_common (
          }
          mg_http_reply(c, 200, headers, "%s", user.stringify(true).c_str());
          vhost.save();
+      } else if (strstr(path, "/message")) {
+         //upload?
+         if (!bid.length() || !rbs[bid] || !rbs[bid]["user"]) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
+                          "nobidOrNotSignedIn");
+            goto done;
+         }
+         username=(ccp)rbs[bid]["user"];
+         if (!sessionData["content"]) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "No Content!");
+            goto done;
+         }
+         FFJSON cntnt((ccp)sessionData["content"]);
+         ccp tuser = cntnt["user"];
+         if (!users[tuser]||!cntnt["id"]) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
+            goto done;
+         }
+         int tid = cntnt["id"];
+         if (!users[tuser]["things"]||tid<0||tid>=users[tuser]["things"].size) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
+            goto done;
+         }
+         FFJSON& rmsgs = users[tuser]["things"][tid]["rmsgs"];
+         if (!rmsgs) {
+            rmsgs.init("[]");
+         }
+         FFJSON& smsgs = users[username]["smsgs"];
+         if (!smsgs) {
+            smsgs.init("[]");
+         }
+         int rmid=rmsgs.size;
+         int smid=smsgs.size;
+         if (!rmid) {
+            rmid = 1;
+         } else {
+            rmid = (int)rmsgs[rmid-1]["id"]+1;
+         }
+         rmsgs[rmid]["user"]=username;
+         rmsgs[rmid]["msg"]=cntnt["msg"];
+         smsgs[smid]["user"]=tuser;
+         smsgs[smid]["tid"]=tid;
+         smsgs[smid]["mid"]=rmid;
+         mg_http_reply(c, 200, headers, "%s", "{\"status\":1}");
       } else if (strstr(path, "/upload?")) {
          //upload?
-         if (!bid.length() || !rbs[bid]) {
-            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
+         if (!bid.length() || !rbs[bid] || !rbs[bid]["user"]) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
+                          "nobidOrNotSignedIn");
             goto done;
          }
          username=(ccp)rbs[bid]["user"];
@@ -942,7 +987,7 @@ void tls_ntls_common (
             }
          }
          char msg[30];
-         sprintf(msg, "{\"thingId\":%d,\"picId\":%d", thingId,picId);
+         sprintf(msg, "{\"thingId\":%d,\"picId\":%d", thingId, picId);
          mg_http_upload(
             c, hm, &mg_fs_posix, upldpth.c_str(), 2999999, msg);
          if (fofst+chnkSz >= ttlSz) {
