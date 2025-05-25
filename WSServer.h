@@ -90,20 +90,20 @@ struct ParentQuadHldr {
    ParentQuadHldr* pQH;
    float x,y;
    deque<WholeQuadNode>* pqcqh;
-   char ind;
+   int8_t ind;
 };
 struct WholeQuadNode {
    QuadNode* qn;
    float x,y,dx,dy;
    char xsign,ysign,rxsign,rysign;
    QuadNode* pQN;
-   char ind;
+   int8_t ind;
    QuadHldr* qh;
 };
 struct Direction {
-   char x;
-   char y;
-   char abs ();
+   int8_t x;
+   int8_t y;
+   int8_t abs ();
 };
 struct NdNPrn {
    QuadHldr* qh=nullptr;
@@ -111,7 +111,7 @@ struct NdNPrn {
    float dx = 0.0;
    float ds = 0.0;
    Direction d;
-   char ind;
+   int8_t ind;
    void print () const;
 };
 typedef unsigned uchar;
@@ -134,12 +134,12 @@ union QuadHldr {
    QuadNode* qn ();
    uint insert (
       FFJSON& rF, vector<uint>& ina, bool deleteLeaf = false, uint level = 0,
-      float x = 0.0, float y = 0.0, QuadNode* tQN = nullptr, char tind=0,
-      QuadNode* pQN = nullptr, char ind=0, char sn = 0
+      float x = 0.0, float y = 0.0, QuadNode* tQN = nullptr, int8_t tind=0,
+      QuadNode* pQN = nullptr, int8_t ind=0, int8_t sn = 0
    );
    uint getPointsFromQuad (
       Pts& pts, uint level=0, float x=0, float y=0,
-      QuadNode* tQN=nullptr, char tind=0, QuadNode* pQN=nullptr, char ind=0
+      QuadNode* tQN=nullptr, int8_t tind=0, QuadNode* pQN=nullptr, int8_t ind=0
    );
    // uint getPointsFromRadius (
    //    set<FFJSON*, CompareByDistanceToCenter>& pts, Circle& c, uint minPts=30,
@@ -147,20 +147,20 @@ union QuadHldr {
    // );
    // uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
    //                            QuadNode* pQN);
-   uint findNeighbours (Pts& pts, QuadNode* tQN=nullptr, char tind=0,
-                        QuadNode* pQN=nullptr, char ind=0, float dx =0.0,
+   uint findNeighbours (Pts& pts, QuadNode* tQN=nullptr, int8_t tind=0,
+                        QuadNode* pQN=nullptr, int8_t ind=0, float dx =0.0,
                         float ds=0.0, Direction d = {0},
                         bool notChild = false);
    uint addChildrenOnEdge (Pts& pts, Direction d, QuadNode* pQN,
-                           char ind, float dx, float ds, bool noChk=false);
+                           int8_t ind, float dx, float ds, bool noChk=false);
    int addThis (Pts& pts, Direction d, float dx, float ds,
-                 QuadNode* pQN, char ind = 0, int noChk = 0);
+                 QuadNode* pQN, int8_t ind = 0, int noChk = 0);
    void print (Circle& c, uint level = 0, QuadNode* tQN = nullptr,
-               char tind = 0, QuadNode* pQN = nullptr, char ind = 0);
-   vector<uint> getIntNames (QuadNode* tQN=nullptr, char tind=0,
-                             QuadNode* pQN=nullptr, char ind=0); 
-   // void del (QuadNode* tQN = nullptr, char tind = 0,
-   //           QuadNode* pQN = nullptr, char ind = 0);
+               int8_t tind = 0, QuadNode* pQN = nullptr, int8_t ind = 0);
+   vector<uint> getIntNames (QuadNode* tQN=nullptr, int8_t tind=0,
+                             QuadNode* pQN=nullptr, int8_t ind=0); 
+   // void del (QuadNode* tQN = nullptr, int8_t tind = 0,
+   //           QuadNode* pQN = nullptr, int8_t ind = 0);
 };
 
 struct CompareByDistanceToCenter {
@@ -187,12 +187,12 @@ struct QuadNode {
    QuadHldr wn;
    QuadHldr ws;
    QuadNode ();
-   void del (QuadNode* tQN = nullptr, char tind = 0,
-             QuadNode* pQN = nullptr, char ind = 0);
+   void del (QuadNode* tQN = nullptr, int8_t tind = 0,
+             QuadNode* pQN = nullptr, int8_t ind = 0);
    void seti (vector<uint>& ina);
    uint hasName (vector<uint>& ina, vector<map<QuadNode*,uint>::iterator> vit);
-   void updateIntNames (QuadNode* tQN = nullptr, char tind = 0,
-                        QuadNode* pQN = nullptr, char ind = 0);
+   void updateIntNames (QuadNode* tQN = nullptr, int8_t tind = 0,
+                        QuadNode* pQN = nullptr, int8_t ind = 0);
    ~QuadNode ();
 };
 
