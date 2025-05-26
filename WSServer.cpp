@@ -893,6 +893,13 @@ void tls_ntls_common (
          rmsgs[rmind]["id"]=rmid;
          rmsgs[rmind]["user"]=username;
          rmsgs[rmind]["msg"]=cntnt["msg"];
+         auto now = chrono::high_resolution_clock::now();
+         auto now_ms =
+            std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+         auto epoch = now_ms.time_since_epoch();
+         long lepoch = epoch.count();
+         rmsgs[rmind]["ts"]=lepoch;
+         rmsgs[rmind]["new"]=true;
          smsgs[smind]["user"]=tuser;
          smsgs[smind]["tid"]=tid;
          smsgs[smind]["mid"]=rmid;
@@ -1550,11 +1557,6 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, int8_t tind,
          QuadHldr* pQH = &pQN->en+ind;
          auto tuppqh = bpxor(pQH->fp, tQN);
          QuadNode* ppQN = (QuadNode*)get<0>(tuppqh);
-         vector<map<QuadNode*,uint>::iterator> qit =
-            qpfind(ppQN);
-         if (pts.ina.size() && !(qit.size() && ppQN->hasName(pts.ina,qit))) {
-            return 0;
-         }
          //printf("fn:ppQN:%p\n", ppQN);
          lind=get<1>(tuppqh);
          uint ptscnt = pQH->findNeighbours(
@@ -1566,7 +1568,8 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, int8_t tind,
             tuppqh = getNode(ndprn);
             QuadHldr* presqp = (QuadHldr*)get<0>(tuppqh);
             int8_t iix, iiy, lind, pind;
-            qit = qpfind((QuadNode*)presqp);
+            vector<map<QuadNode*,uint>::iterator> qit =
+               qpfind((QuadNode*)presqp);
             if (!(qit.size() && ((QuadNode*)presqp)->hasName(pts.ina,qit)) ||
                ndprn.qh->fp==nullptr) {
                ndprn.qh->addThis(pts, d, ndprn.dx, ndprn.ds, ndprn.prn,
@@ -1636,13 +1639,15 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, int8_t tind,
             ncnt+=findNeighbours(pts, tQN, tind, pQN, ind, dx, dx/2, d);
          }
       }
-      printpts(pts.pts);
-      pts.nni = pts.pts.size()-1;
-      quickSort(pts.pts,pts.ni,pts.nni);
-      printf("---------\n");
-      printpts(pts.pts);
-      printf("---------\n");
+      //printpts(pts.pts);
       ++pts.ni;
+      pts.nni = pts.pts.size()-1;
+      if (pts.nni<0)
+         return 0;
+      quickSort(pts.pts,pts.ni,pts.nni);
+      //printf("---------\n");
+      //printpts(pts.pts);
+      //printf("---------\n");
       uint pni=pts.ni;
       while (pts.ni<pts.pts.size() && pni<pts.minPts) {
          NdNPrn nd = pts.pts[pts.ni];
@@ -1896,6 +1901,8 @@ WSServer::WSServer (
    
    makeThngsTree();
    Pts pts;
+   vector<string> mstr = metaname("car");
+   pts.ina=nametouint(mstr);
    //Circle c = {180.0, 90.0, 10.5};
    //Circle c = {0.1, 0.1, 10.5};
    //Circle c = {0.9, 0.8, 10.5};
