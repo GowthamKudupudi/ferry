@@ -843,7 +843,7 @@ void tls_ntls_common (
          }
          mg_http_reply(c, 200, headers, "%s", user.stringify(true).c_str());
          vhost.save();
-      } else if (strstr(path, "/msg")) {
+      } else if (strstr(path, "/owl")) {
          //upload?
          if (!bid.length() || !rbs[bid] || !rbs[bid]["user"]) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
@@ -856,54 +856,120 @@ void tls_ntls_common (
             goto done;
          }
          FFJSON cntnt((ccp)sessionData["content"]);
-         ccp tuser = cntnt["user"];
-         FFJSON& tfuser = users[tuser];
-         if (!tfuser||!cntnt["id"]) {
-            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
-            goto done;
+         FFJSON& tfthings = users[username]["things"];
+         FFJSON& fQs = cntnt["Qs"];
+         FFJSON::Iterator it;
+         if (!fQs) {
+            goto rqs;
          }
-         int tid = cntnt["id"];
-         FFJSON& tfthings = tfuser["things"];
-         if (!tfuser["things"]||tid<0) {
-            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
-            goto done;
-         }
-         int last = tfthings.size;
-         last = tid<last?tid:last;
-         for (int i=last-1;i>=0;++i) {
-            if ((int)tfthings[i]["id"]==tid) {
-               tid=i;
-               break;
+         it = fQs.begin();
+         while (it!=fQs.end()) {
+            ccp tuser = (ccp)it;
+            FFJSON::Iterator tit;
+            if (tuser) {
+               tit  = users.find(tuser);
             }
+            if (!tuser || tit==users.end()) {
+               mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
+               goto done;
+            }
+            FFJSON& tfuser = users[tuser];
+            FFJSON& tfthings = tfuser["things"];
+            tit = it->begin();
+            while (tit!=it->end()) {
+               ccp ctid = (ccp)tit;
+               if (!ctid) {
+                  mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
+                  goto done;
+               }
+               int tid = atoi(ctid);
+               int last = tfthings.size;
+               last = tid<last?tid:last;
+               for (int i=last-1;i>=0;++i) {
+                  if ((int)tfthings[i]["id"]==tid) {
+                     tid=i;
+                     break;
+                  }
+               }
+               if (tid<0 || tid>=last) {
+                  mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
+                  goto done;                     
+               }
+               FFJSON& rmsgs = tfthings[tid]["rmsgs"];
+               if (!rmsgs) {
+                  rmsgs.init("[]");
+               }
+               FFJSON& smsgs = users[username]["smsgs"];
+               if (!smsgs) {
+                  smsgs.init("[]");
+               }
+               int rmind=rmsgs.size;
+               int smind=smsgs.size;
+               int rmid=rmid;
+               if (rmind) {
+                  rmid = (int)rmsgs[rmind-1]["id"]+1;
+               }
+               rmsgs[rmind]["id"]=rmid;
+               rmsgs[rmind]["user"]=username;
+               rmsgs[rmind]["msg"]=*tit;
+               auto now = chrono::high_resolution_clock::now();
+               auto now_ms =
+                  std::chrono::
+                  time_point_cast<std::chrono::milliseconds>(now);
+               auto epoch = now_ms.time_since_epoch();
+               long lepoch = epoch.count();
+               rmsgs[rmind]["ts"]=lepoch;
+               rmsgs[rmind]["new"]=true;
+               smsgs[smind]["user"]=tuser;
+               smsgs[smind]["tid"]=tid;
+               smsgs[smind]["mid"]=rmid;
+               *tit=rmid;
+               ++tit;
+            }
+            ++it;
          }
-         FFJSON& rmsgs = tfthings[tid]["rmsgs"];
-         if (!rmsgs) {
-            rmsgs.init("[]");
+        rqs:
+         FFJSON& fRs = cntnt["Rs"];
+         if (!fRs) {
+            goto owldone;
          }
-         FFJSON& smsgs = users[username]["smsgs"];
-         if (!smsgs) {
-            smsgs.init("[]");
+         it = fRs.begin();
+         while (it!=fQs.end()) {
+            ccp ctid = (ccp)it;
+            if (!ctid) {
+               mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
+               goto done;
+            }
+            int tid = atoi(ctid);
+            int last = tfthings.size;
+            last = tid<last?tid:last;
+            for (int i=last-1;i>=0;++i) {
+               if ((int)tfthings[i]["id"]==tid) {
+                  tid=i;
+                  break;
+               }
+            }
+            if (tid<0 || tid>=last) {
+               mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
+                             "yay!");
+               goto done;                     
+            }
+            FFJSON& rmsgs = tfthings[tid]["rmsgs"];
+            FFJSON::Iterator tit = it->begin();
+            while (tit!=it->end()) {
+               int mid = (int)*tit;
+               if (mid>=rmsgs.size || mid<0) {
+                  mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
+                  goto done;
+               }
+               rmsgs[mid].erase("new");
+               ++tit;
+            }
+            ++it;
          }
-         int rmind=rmsgs.size;
-         int smind=smsgs.size;
-         int rmid=rmid;
-         if (rmind) {
-            rmid = (int)rmsgs[rmind-1]["id"]+1;
-         }
-         rmsgs[rmind]["id"]=rmid;
-         rmsgs[rmind]["user"]=username;
-         rmsgs[rmind]["msg"]=cntnt["msg"];
-         auto now = chrono::high_resolution_clock::now();
-         auto now_ms =
-            std::chrono::time_point_cast<std::chrono::milliseconds>(now);
-         auto epoch = now_ms.time_since_epoch();
-         long lepoch = epoch.count();
-         rmsgs[rmind]["ts"]=lepoch;
-         rmsgs[rmind]["new"]=true;
-         smsgs[smind]["user"]=tuser;
-         smsgs[smind]["tid"]=tid;
-         smsgs[smind]["mid"]=rmid;
-         mg_http_reply(c, 200, headers, "{\"id\":%d}", rmid);
+     owldone:
+         cntnt["status"]=1;
+         mg_http_reply(c, 200, headers, "%s", cntnt.stringify().c_str());
          users.save();
       } else if (strstr(path, "/upload?")) {
          //upload?
