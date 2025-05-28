@@ -419,6 +419,10 @@ void tls_ntls_common (
       if (cookie["bid"]) {
          bid=(ccp)cookie["bid"];
       }
+      auto now = chrono::system_clock::now();
+      auto now_ms =
+         chrono::time_point_cast<chrono::milliseconds>(now);
+      long lepoch = now_ms.time_since_epoch().count();
       if (!sessionData["referer"]) goto nextproto;
       referer=sessionData["referer"];
       username = strstr(referer,":");
@@ -453,10 +457,11 @@ void tls_ntls_common (
          if ((uint32_t)rbs[bid]["ip"]!=c->rem.ip) {
             goto newbid;
          }
-         rbs[bid]["ts"]=chrono::high_resolution_clock::now();
+         rbs[bid]["ts"]=now;
          FFJSON reply;
          username = rbs[bid]["user"];
          if (username) {
+            rbs[bid]["urts"]=lepoch;
             reply = users[(ccp)rbs[bid]["user"]];
          }
          reply["bid"]=bid;
@@ -512,6 +517,7 @@ void tls_ntls_common (
             rbs[bid]["user"]=user["name"];
             rbs[bid]["ip"]=c->rem.ip;
             user["bid"]=bid;
+            rbs[bid]["urts"]=lepoch;
             mg_http_reply(c, 200, headers, "%s",
                           user.stringify(true).c_str());
             rbs.save();
@@ -844,7 +850,6 @@ void tls_ntls_common (
          mg_http_reply(c, 200, headers, "%s", user.stringify(true).c_str());
          vhost.save();
       } else if (strstr(path, "/owl")) {
-         //upload?
          if (!bid.length() || !rbs[bid] || !rbs[bid]["user"]) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
                           "nobidOrNotSignedIn");
@@ -856,15 +861,22 @@ void tls_ntls_common (
             goto done;
          }
          FFJSON cntnt((ccp)sessionData["content"]);
-         FFJSON& tfthings = users[username]["things"];
+         FFJSON& user = users[username];
+         FFJSON& things = user["things"];
          FFJSON& fQs = cntnt["Qs"];
          FFJSON::Iterator it;
+         long urts;
+         long lmts;
          if (!fQs) {
             goto rqs;
          }
          it = fQs.begin();
          while (it!=fQs.end()) {
             ccp tuser = (ccp)it;
+            if (!strcmp(tuser,username)) {
+               mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
+               goto done;
+            }
             FFJSON::Iterator tit;
             if (tuser) {
                tit  = users.find(tuser);
@@ -883,19 +895,20 @@ void tls_ntls_common (
                   goto done;
                }
                int tid = atoi(ctid);
+               int tind = 0;
                int last = tfthings.size;
                last = tid<last?tid:last;
                for (int i=last-1;i>=0;++i) {
                   if ((int)tfthings[i]["id"]==tid) {
-                     tid=i;
+                     tind=i;
                      break;
                   }
                }
-               if (tid<0 || tid>=last) {
+               if (tind<0 || tind>=last) {
                   mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
-                  goto done;                     
+                  goto done;
                }
-               FFJSON& rmsgs = tfthings[tid]["rmsgs"];
+               FFJSON& rmsgs = tfthings[tind]["rmsgs"];
                if (!rmsgs) {
                   rmsgs.init("[]");
                }
@@ -905,19 +918,13 @@ void tls_ntls_common (
                }
                int rmind=rmsgs.size;
                int smind=smsgs.size;
-               int rmid=rmid;
+               int rmid=1;
                if (rmind) {
                   rmid = (int)rmsgs[rmind-1]["id"]+1;
                }
                rmsgs[rmind]["id"]=rmid;
                rmsgs[rmind]["user"]=username;
                rmsgs[rmind]["msg"]=*tit;
-               auto now = chrono::high_resolution_clock::now();
-               auto now_ms =
-                  std::chrono::
-                  time_point_cast<std::chrono::milliseconds>(now);
-               auto epoch = now_ms.time_since_epoch();
-               long lepoch = epoch.count();
                rmsgs[rmind]["ts"]=lepoch;
                rmsgs[rmind]["new"]=true;
                smsgs[smind]["user"]=tuser;
@@ -926,39 +933,50 @@ void tls_ntls_common (
                *tit=rmid;
                ++tit;
             }
+            tfuser["lmts"]=lepoch;
             ++it;
          }
+         cntnt["status"]=1;
         rqs:
          FFJSON& fRs = cntnt["Rs"];
          if (!fRs) {
-            goto owldone;
+            goto news;
          }
          it = fRs.begin();
-         while (it!=fQs.end()) {
+         while (it!=fRs.end()) {
             ccp ctid = (ccp)it;
             if (!ctid) {
                mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
                goto done;
             }
             int tid = atoi(ctid);
-            int last = tfthings.size;
+            int tind = 0;
+            int last = things.size;
             last = tid<last?tid:last;
             for (int i=last-1;i>=0;++i) {
-               if ((int)tfthings[i]["id"]==tid) {
-                  tid=i;
+               if ((int)things[i]["id"]==tid) {
+                  tind=i;
                   break;
                }
             }
-            if (tid<0 || tid>=last) {
+            if (tind<0 || tind>=last) {
                mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
                              "yay!");
                goto done;                     
             }
-            FFJSON& rmsgs = tfthings[tid]["rmsgs"];
+            FFJSON& rmsgs = things[tind]["rmsgs"];
             FFJSON::Iterator tit = it->begin();
             while (tit!=it->end()) {
                int mid = (int)*tit;
-               if (mid>=rmsgs.size || mid<0) {
+               last = rmsgs.size;
+               last = mid<last?mid:last;
+               for (int i=last-1;i>=0;++i) {
+                  if ((int)rmsgs[i]["id"]==mid) {
+                     mid=i;
+                     break;
+                  }
+               }
+               if (mid>=last || mid<0) {
                   mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
                   goto done;
                }
@@ -967,10 +985,35 @@ void tls_ntls_common (
             }
             ++it;
          }
+         cntnt["status"]=1;
+        news:
+         if (!user["lmts"]) {
+            goto owldone;
+         }
+         urts = (long)rbs[bid]["urts"];
+         lmts = (long)user["lmts"];
+         if (urts>lmts) {
+            goto owldone;
+         }
+         for (int i=0; i<things.size; ++i) {
+            FFJSON& rmsgs = things[i]["rmsgs"];
+            for (int j=0;j<rmsgs.size;++j) {
+               FFJSON& msg = rmsgs[j];
+               long mts = (long)msg["ts"];
+               if (mts<urts) {
+                  continue;
+               }
+               cntnt["news"][to_string((int)things[i]["id"])]
+                  [to_string(j)]=msg;
+            }
+         }
+         rbs[bid]["urts"]=lepoch;
+         cntnt["status"]=1;
      owldone:
          cntnt["status"]=1;
-         mg_http_reply(c, 200, headers, "%s", cntnt.stringify().c_str());
+         mg_http_reply(c, 200, headers, "%s", cntnt.stringify(true).c_str());
          users.save();
+         rbs.save();
       } else if (strstr(path, "/upload?")) {
          //upload?
          if (!bid.length() || !rbs[bid] || !rbs[bid]["user"]) {
@@ -1077,11 +1120,6 @@ void tls_ntls_common (
          if (fofst+chnkSz >= ttlSz) {
             user.erase("pendingThings");
             user["things"][thngi]["pics"][picId].erase("partial");
-            auto now = chrono::high_resolution_clock::now();
-            auto now_ms =
-               std::chrono::time_point_cast<std::chrono::milliseconds>(now);
-            auto epoch = now_ms.time_since_epoch();
-            long lepoch = epoch.count();
             user["things"][thngi]["pics"][picId]["ts"]=lepoch;
             printf("pendingThings\n");
             users.save();
