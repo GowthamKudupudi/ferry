@@ -558,6 +558,9 @@ void tls_ntls_common (
             goto done;
          }
          FFJSON body(string(hm->body.ptr, hm->body.len));
+         if (body["email"].isType(FFJSON::STRING)) {
+            body["email"]=tolower(string((ccp)body["email"]));
+         }
          if (body["username"]) {
             username=body["username"];
             ffl_debug(FPL_HTTPSERV, "User: %s\nPass: %s\nEmail: %s",
@@ -569,14 +572,14 @@ void tls_ntls_common (
                FFJSON* ffemln = (*emln)[string((ccp)body["email"])];
                FFJSON::Link* link =
                   ffemln->getFeaturedMember(FFJSON::FM_LINK).link;
-            username=(*link)[0].c_str();
-            ffl_debug(FPL_HTTPSERV, "username: %s", username);
+               username=(*link)[0].c_str();
+               ffl_debug(FPL_HTTPSERV, "username: %s", username);
             } else {
                ffl_warn(FPL_HTTPSERV, "%s Email not registered.",
                         (ccp)body["email"]);
                mg_http_reply(c, 200, headers, "{%Q:%d,%Q:%Q}", "actEmailSent",
-                          -5, "msg",
-                          "Email not registered!");
+                             -5, "msg",
+                             "Email not registered!");
                goto done;
             }
          }
