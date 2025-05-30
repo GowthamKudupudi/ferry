@@ -381,6 +381,19 @@ void quickSort (vector<NdNPrn>& pts, int start, int end) {
       }
    }
 }
+void addSmtgsToReply (FFJSON& reply, FFJSON& users, FFJSON& user) {
+   FFJSON::Iterator stit = user.find("smsgs");
+   FFJSON& rthings = reply["things"];
+   if (stit!=user.end()) {
+      FFJSON& smsgs = *stit;
+      for (int i=0; i<smsgs.size; ++i) {
+         FFJSON& s = smsgs[i];
+         FFJSON::Link& link =
+            *s.getFeaturedMember(FFJSON::FM_LINK).link;
+         rthings[rthings.size]=users[link[0]][link[1]][link[2]];
+      }
+   }
+}
 void tls_ntls_common (
    struct mg_connection* c, int ev, void* ev_data, void* fn_data
 ) {
@@ -462,7 +475,8 @@ void tls_ntls_common (
          username = rbs[bid]["user"];
          if (username) {
             rbs[bid]["urts"]=lepoch;
-            reply = users[(ccp)rbs[bid]["user"]];
+            FFJSON& user = users[(ccp)rbs[bid]["user"]];
+            addSmtgsToReply(reply, users, user);
          }
          reply["bid"]=bid;
          Pts pts;
@@ -518,8 +532,10 @@ void tls_ntls_common (
             rbs[bid]["ip"]=c->rem.ip;
             user["bid"]=bid;
             rbs[bid]["urts"]=lepoch;
+            FFJSON reply=user;
+            addSmtgsToReply(reply, users, user);
             mg_http_reply(c, 200, headers, "%s",
-                          user.stringify(true).c_str());
+                          reply.stringify(true).c_str());
             rbs.save();
             users.save();
          } else {
@@ -915,7 +931,7 @@ void tls_ntls_common (
                if (!rmsgs) {
                   rmsgs.init("[]");
                }
-               FFJSON& smsgs = users[username]["smsgs"];
+               FFJSON& smsgs = user["smsgs"];
                if (!smsgs) {
                   smsgs.init("[]");
                }
@@ -930,9 +946,9 @@ void tls_ntls_common (
                rmsgs[rmind]["msg"]=*tit;
                rmsgs[rmind]["ts"]=lepoch;
                rmsgs[rmind]["new"]=true;
-               smsgs[smind]["user"]=tuser;
-               smsgs[smind]["tid"]=tid;
-               smsgs[smind]["mid"]=rmid;
+               smsgs[smind].addLink(
+                  users,string(tuser)+".things."+to_string(tind)+".rmsgs."+
+                  to_string(rmind));
                *tit=rmid;
                ++tit;
             }
