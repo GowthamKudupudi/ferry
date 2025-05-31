@@ -381,18 +381,22 @@ void quickSort (vector<NdNPrn>& pts, int start, int end) {
       }
    }
 }
-void addSmtgsToReply (FFJSON& reply, FFJSON& users, FFJSON& user) {
+set<FFJSON*> addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r) {
+   set<FFJSON*> fs;
    FFJSON::Iterator stit = user.find("smsgs");
-   FFJSON& rthings = reply["things"];
    if (stit!=user.end()) {
       FFJSON& smsgs = *stit;
+      FFJSON& rts = r["things"];
       for (int i=0; i<smsgs.size; ++i) {
-         FFJSON& s = smsgs[i];
+         FFJSON& s = *(*smsgs.val.array)[i];
          FFJSON::Link& link =
             *s.getFeaturedMember(FFJSON::FM_LINK).link;
-         rthings[rthings.size]=users[link[0]][link[1]][link[2]];
+         FFJSON& ut = users[link[2]][link[3]][link[4]];
+         fs.insert(&ut);
+         rts[rts.size]=ut;
       }
    }
+   return fs;
 }
 void tls_ntls_common (
    struct mg_connection* c, int ev, void* ev_data, void* fn_data
@@ -473,10 +477,12 @@ void tls_ntls_common (
          rbs[bid]["ts"]=now;
          FFJSON reply;
          username = rbs[bid]["user"];
+         set<FFJSON*> mdts;
          if (username) {
             rbs[bid]["urts"]=lepoch;
             FFJSON& user = users[(ccp)rbs[bid]["user"]];
-            addSmtgsToReply(reply, users, user);
+            reply = user;
+            mdts = addSmtgsToReply(users, user, reply); 
          }
          reply["bid"]=bid;
          Pts pts;
@@ -501,7 +507,8 @@ void tls_ntls_common (
                f = (FFJSON*)get<0>(aa);
             }
             ccp un = (*f)["user"]["name"];
-            if (!username || strcmp(un,username)) {
+            set<FFJSON*>::iterator it = mdts.find(f);
+            if ((!username || strcmp(un,username)) && it==mdts.end()) {
                reply["things"][k]=f;
                ++k;
             }
@@ -533,7 +540,7 @@ void tls_ntls_common (
             user["bid"]=bid;
             rbs[bid]["urts"]=lepoch;
             FFJSON reply=user;
-            addSmtgsToReply(reply, users, user);
+            addSmtgsToReply(users, user, reply);
             mg_http_reply(c, 200, headers, "%s",
                           reply.stringify(true).c_str());
             rbs.save();
@@ -946,9 +953,9 @@ void tls_ntls_common (
                rmsgs[rmind]["msg"]=*tit;
                rmsgs[rmind]["ts"]=lepoch;
                rmsgs[rmind]["new"]=true;
-               smsgs[smind].addLink(
-                  users,string(tuser)+".things."+to_string(tind)+".rmsgs."+
-                  to_string(rmind));
+               users.addLink(
+                  string(tuser)+".things."+to_string(tind)+".rmsgs."+
+                  to_string(rmind), string(username)+".smsgs."+to_string(smind));
                *tit=rmid;
                ++tit;
             }
