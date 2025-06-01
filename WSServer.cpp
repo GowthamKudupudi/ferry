@@ -381,17 +381,32 @@ void quickSort (vector<NdNPrn>& pts, int start, int end) {
       }
    }
 }
+
+int getIdChildInd (FFJSON& arr, int id) {
+   int last = arr.size;
+   last = id<last?id:last;
+   for (int i=last-1;i>=0;++i) {
+      if ((int)arr[i]["id"]==id) {
+         return i;
+      }
+   }
+   return -1;
+}
+
 set<FFJSON*> addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r) {
    set<FFJSON*> fs;
    FFJSON::Iterator stit = user.find("smsgs");
    if (stit!=user.end()) {
       FFJSON& smsgs = *stit;
       FFJSON& rts = r["things"];
+      FFJSON& rsmsgs = r["smsgs"];
       for (int i=0; i<smsgs.size; ++i) {
-         FFJSON& s = *(*smsgs.val.array)[i];
-         FFJSON::Link& link =
-            *s.getFeaturedMember(FFJSON::FM_LINK).link;
-         FFJSON& ut = users[link[2]][link[3]][link[4]];
+         FFJSON& s = smsgs[i];
+         if (!s[0].size)
+            continue;
+         FFJSON& uts = users[(ccp)s[0]]["things"];
+         int tind = getIdChildInd(uts, (int)s[1]);
+         FFJSON& ut = uts[tind];
          fs.insert(&ut);
          rts[rts.size]=ut;
       }
@@ -889,6 +904,11 @@ void tls_ntls_common (
          FFJSON cntnt((ccp)sessionData["content"]);
          FFJSON& user = users[username];
          FFJSON& things = user["things"];
+         FFJSON& smsgs = user["smsgs"];
+         if (!smsgs) {
+            smsgs.init("[]");
+         }
+         int smind=smsgs.size;
          FFJSON& fQs = cntnt["Qs"];
          FFJSON::Iterator it;
          long urts;
@@ -921,16 +941,8 @@ void tls_ntls_common (
                   goto done;
                }
                int tid = atoi(ctid);
-               int tind = 0;
-               int last = tfthings.size;
-               last = tid<last?tid:last;
-               for (int i=last-1;i>=0;++i) {
-                  if ((int)tfthings[i]["id"]==tid) {
-                     tind=i;
-                     break;
-                  }
-               }
-               if (tind<0 || tind>=last) {
+               int tind = getIdChildInd(tfthings, tid);
+               if (tind<0) {
                   mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
                   goto done;
                }
@@ -938,12 +950,8 @@ void tls_ntls_common (
                if (!rmsgs) {
                   rmsgs.init("[]");
                }
-               FFJSON& smsgs = user["smsgs"];
-               if (!smsgs) {
-                  smsgs.init("[]");
-               }
                int rmind=rmsgs.size;
-               int smind=smsgs.size;
+               smind=smsgs.size;
                int rmid=1;
                if (rmind) {
                   rmid = (int)rmsgs[rmind-1]["id"]+1;
@@ -953,9 +961,11 @@ void tls_ntls_common (
                rmsgs[rmind]["msg"]=*tit;
                rmsgs[rmind]["ts"]=lepoch;
                rmsgs[rmind]["new"]=true;
-               users.addLink(
-                  string(tuser)+".things."+to_string(tind)+".rmsgs."+
-                  to_string(rmind), string(username)+".smsgs."+to_string(smind));
+               rmsgs[rmind]["smind"]=smind;
+               smsgs[smind].init("[]");
+               smsgs[smind][0]=tuser;
+               smsgs[smind][1]=tid;
+               smsgs[smind][2]=rmid;
                *tit=rmid;
                ++tit;
             }
@@ -976,16 +986,8 @@ void tls_ntls_common (
                goto done;
             }
             int tid = atoi(ctid);
-            int tind = 0;
-            int last = things.size;
-            last = tid<last?tid:last;
-            for (int i=last-1;i>=0;++i) {
-               if ((int)things[i]["id"]==tid) {
-                  tind=i;
-                  break;
-               }
-            }
-            if (tind<0 || tind>=last) {
+            int tind = getIdChildInd(things, tid);
+            if (tind<0) {
                mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
                              "yay!");
                goto done;                     
@@ -994,15 +996,8 @@ void tls_ntls_common (
             FFJSON::Iterator tit = it->begin();
             while (tit!=it->end()) {
                int mid = (int)*tit;
-               last = rmsgs.size;
-               last = mid<last?mid:last;
-               for (int i=last-1;i>=0;++i) {
-                  if ((int)rmsgs[i]["id"]==mid) {
-                     mid=i;
-                     break;
-                  }
-               }
-               if (mid>=last || mid<0) {
+               mid = getIdChildInd(rmsgs, mid);
+               if (mid<0) {
                   mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
                   goto done;
                }
@@ -1014,12 +1009,12 @@ void tls_ntls_common (
          cntnt["status"]=1;
         news:
          if (!user["lmts"]) {
-            goto owldone;
+            goto rnews;
          }
          urts = (long)rbs[bid]["urts"];
          lmts = (long)user["lmts"];
          if (urts>lmts) {
-            goto owldone;
+            goto reps;
          }
          for (int i=0; i<things.size; ++i) {
             FFJSON& rmsgs = things[i]["rmsgs"];
@@ -1035,7 +1030,64 @@ void tls_ntls_common (
          }
          rbs[bid]["urts"]=lepoch;
          cntnt["status"]=1;
-     owldone:
+        rnews:
+         if (!user["lrts"]) {
+            goto reps;
+         }
+         urts = (long)rbs[bid]["lrrts"];
+         lrts = (long)user["lrts"];
+         if (urts>lrts) {
+            goto reps;
+         }
+         for ()
+         rbs[bid]["lrrts"]=lepoch;
+        reps:
+         FFJSON& fRps = cntnt["Reps"];
+         if (!fRps) {
+            goto owldone;
+         }
+         it = fRps.begin();
+         while (it!=fRps.end()) {
+            ccp ctid = (ccp)it;
+            if (!ctid) {
+               mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
+               goto done;
+            }
+            int tid = atoi(ctid);
+            int tind = getIdChildInd(things, tid);
+            if (tind<0) {
+               mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
+                             "yay!");
+               goto done;                     
+            }
+            FFJSON& rmsgs = things[tind]["rmsgs"];
+            FFJSON::Iterator tit = it->begin();
+            while (tit!=it->end()) {
+               int mid = stoi((ccp)tit);
+               int mind = getIdChildInd(rmsgs, mid);
+               if (mind<0) {
+                  mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
+                  goto done;
+               }
+               smind=smsgs.size;
+               rmsgs[mind]["rep"]=*tit;
+               smsgs[smind].init("[]");
+               smsgs[smind][0]="";
+               smsgs[smind][1]=tid;
+               smsgs[smind][2]=mid;
+               FFJSON& tusr = users[(ccp)rmsgs[mind]["user"]];
+               FFJSON& treps = tusr["reps"];
+               if (!treps) {
+                  treps.init("[]");
+               }
+               treps[treps.size]=rmsgs[mind]["smind"];
+               tusr["lrts"]=lepoch;
+               ++tit;
+            }
+            ++it;
+         }
+         cntnt["status"]=1;
+        owldone:
          cntnt["status"]=1;
          mg_http_reply(c, 200, headers, "%s", cntnt.stringify(true).c_str());
          users.save();
