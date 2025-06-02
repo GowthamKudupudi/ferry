@@ -408,7 +408,11 @@ set<FFJSON*> addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r) {
          int tind = getIdChildInd(uts, (int)s[1]);
          FFJSON& ut = uts[tind];
          fs.insert(&ut);
-         rts[rts.size]=ut;
+      }
+      set<FFJSON*>::iterator it = fs.begin();
+      while (it!=fs.end()) {
+         rts[rts.size]=**it;
+         ++it;
       }
    }
    return fs;
@@ -716,6 +720,8 @@ void tls_ntls_common (
             }
             user["name"]=username;
             user["inactive"]=false;
+            user["smsgs"].init("[]");
+            user["reps"].init("[]");
             mg_http_reply(c, 200, headers, "%s activated.", username);
             users.save();
          } else {
@@ -905,14 +911,13 @@ void tls_ntls_common (
          FFJSON& user = users[username];
          FFJSON& things = user["things"];
          FFJSON& smsgs = user["smsgs"];
-         if (!smsgs) {
-            smsgs.init("[]");
-         }
+         FFJSON& reps = user["reps"];
          int smind=smsgs.size;
          FFJSON& fQs = cntnt["Qs"];
          FFJSON::Iterator it;
          long urts;
          long lmts;
+         int i,j;
          if (!fQs) {
             goto rqs;
          }
@@ -976,7 +981,7 @@ void tls_ntls_common (
         rqs:
          FFJSON& fRs = cntnt["Rs"];
          if (!fRs) {
-            goto news;
+            goto rrs;
          }
          it = fRs.begin();
          while (it!=fRs.end()) {
@@ -1007,11 +1012,26 @@ void tls_ntls_common (
             ++it;
          }
          cntnt["status"]=1;
+        rrs:
+         FFJSON& frrs = cntnt["rrs"];
+         if (!frrs) {
+            goto news;
+         }
+         for (int i=0; i<frrs.size; ++i) {
+            int smind = frrs[i];
+            for (int j=0; j<reps.size; j+=2) {
+               if ((int)reps[j]==smind) {
+                  reps.erase(j,j+1);
+                  break;
+               }
+            }
+         }
+         cntnt["status"]=1;
         news:
+         urts = (long)rbs[bid]["urts"];
          if (!user["lmts"]) {
             goto rnews;
          }
-         urts = (long)rbs[bid]["urts"];
          lmts = (long)user["lmts"];
          if (urts>lmts) {
             goto reps;
@@ -1028,19 +1048,31 @@ void tls_ntls_common (
                   [to_string(j)]=msg;
             }
          }
-         rbs[bid]["urts"]=lepoch;
          cntnt["status"]=1;
         rnews:
-         if (!user["lrts"]) {
+         if (!user["reps"].size) {
             goto reps;
          }
-         urts = (long)rbs[bid]["lrrts"];
-         lrts = (long)user["lrts"];
-         if (urts>lrts) {
+         i=reps.size-1;
+         lmts = (long)reps[i];
+         if (urts>lmts) {
             goto reps;
          }
-         for ()
-         rbs[bid]["lrrts"]=lepoch;
+         j=0;
+         do {
+            --i;
+            int smind = reps[i];
+            FFJSON& smsg = smsgs[smind];
+            FFJSON& tusrts = users[(ccp)smsg[0]]["things"];
+            int tind = getIdChildInd(tusrts, (int)smsg[1]);
+            FFJSON& trmsgs = tusrts[tind]["rmsgs"];
+            int mind = getIdChildInd(trmsgs, (int)smsg[2]);
+            FFJSON& rep=cntnt["rnews"][j];
+            rep=smsg;
+            rep[3]=trmsgs[mind]["rep"];
+            --i;++j;
+            lmts=(long)reps[i];
+         } while (urts<lmts);
         reps:
          FFJSON& fRps = cntnt["Reps"];
          if (!fRps) {
@@ -1081,7 +1113,7 @@ void tls_ntls_common (
                   treps.init("[]");
                }
                treps[treps.size]=rmsgs[mind]["smind"];
-               tusr["lrts"]=lepoch;
+               treps[treps.size]=lepoch;
                ++tit;
             }
             ++it;
@@ -1089,6 +1121,7 @@ void tls_ntls_common (
          cntnt["status"]=1;
         owldone:
          cntnt["status"]=1;
+         rbs[bid]["urts"]=lepoch;
          mg_http_reply(c, 200, headers, "%s", cntnt.stringify(true).c_str());
          users.save();
          rbs.save();
