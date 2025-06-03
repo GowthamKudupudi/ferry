@@ -2005,7 +2005,7 @@ uint QuadHldr::getPointsFromQuad (
       return findNeighbours(pts, tQN, tind, pQN, ind, dx);
    } else {
       QuadNode* resqp = (QuadNode*)resfp;
-      int8_t matchcount = (int8_t)resqp->hasName(pts.ina,qit);
+      uint8_t matchcount = (uint8_t)resqp->hasName(pts.ina,qit);
       if (!matchcount) {
          return findNeighbours(pts, tQN, tind, pQN, ind, dx);
       }

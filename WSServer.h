@@ -19,6 +19,7 @@
 #include <list>
 #include <thread>
 #include <queue>
+#include <math.h>
 
 using namespace std;
 using namespace placeholders;
