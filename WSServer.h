@@ -112,7 +112,7 @@ struct NdNPrn {
    float dx = 0.0;
    float ds = 0.0;
    Direction d;
-   int8_t ind;
+   uint8_t ind;
    void print () const;
 };
 typedef unsigned uchar;
@@ -148,18 +148,18 @@ union QuadHldr {
    // );
    // uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
    //                            QuadNode* pQN);
-   uint findNeighbours (Pts& pts, QuadNode* tQN=nullptr, int8_t tind=0,
-                        QuadNode* pQN=nullptr, int8_t ind=0, float dx =0.0,
+   uint findNeighbours (Pts& pts, QuadNode* tQN=nullptr, uint8_t tind=0,
+                        QuadNode* pQN=nullptr, uint8_t ind=0, float dx =0.0,
                         float ds=0.0, Direction d = {0},
                         bool notChild = false);
    uint addChildrenOnEdge (Pts& pts, Direction d, QuadNode* pQN,
-                           int8_t ind, float dx, float ds, bool noChk=false);
+                           uint8_t ind, float dx, float ds, bool noChk=false);
    int addThis (Pts& pts, Direction d, float dx, float ds,
-                 QuadNode* pQN, int8_t ind = 0, int noChk = 0);
+                 QuadNode* pQN, uint8_t ind = 0, int noChk = 0);
    void print (Circle& c, uint level = 0, QuadNode* tQN = nullptr,
-               int8_t tind = 0, QuadNode* pQN = nullptr, int8_t ind = 0);
-   vector<uint> getIntNames (QuadNode* tQN=nullptr, int8_t tind=0,
-                             QuadNode* pQN=nullptr, int8_t ind=0); 
+               uint8_t tind = 0, QuadNode* pQN = nullptr, uint8_t ind = 0);
+   vector<uint> getIntNames (QuadNode* tQN=nullptr, uint8_t tind=0,
+                             QuadNode* pQN=nullptr, uint8_t ind=0); 
    // void del (QuadNode* tQN = nullptr, int8_t tind = 0,
    //           QuadNode* pQN = nullptr, int8_t ind = 0);
 };
@@ -192,8 +192,8 @@ struct QuadNode {
              QuadNode* pQN = nullptr, int8_t ind = 0);
    void seti (vector<uint>& ina);
    uint hasName (vector<uint>& ina, vector<map<QuadNode*,uint>::iterator> vit);
-   void updateIntNames (QuadNode* tQN = nullptr, int8_t tind = 0,
-                        QuadNode* pQN = nullptr, int8_t ind = 0);
+   void updateIntNames (QuadNode* tQN = nullptr, uint8_t tind = 0,
+                        QuadNode* pQN = nullptr, uint8_t ind = 0);
    ~QuadNode ();
 };
 
