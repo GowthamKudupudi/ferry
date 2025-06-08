@@ -107,12 +107,12 @@ struct Direction {
    int8_t abs ();
 };
 struct NdNPrn {
-   QuadHldr* qh=nullptr;
-   QuadNode* prn;
+   QuadHldr* qh = nullptr;
+   QuadNode* prn = nullptr;
    float dx = 0.0;
    float ds = 0.0;
-   Direction d;
-   uint8_t ind;
+   Direction d = {0};
+   uint8_t ind = 0;
    void print () const;
 };
 typedef unsigned uchar;
