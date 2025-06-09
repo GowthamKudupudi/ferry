@@ -395,6 +395,8 @@ int getIdChildInd (FFJSON& arr, int id) {
 map<FFJSON*,set<FFJSON*>> bidThings; 
 int addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r,
                      set<FFJSON*>& mdts) {
+   FFJSON q("{things:!}");
+   user.answerObject(&q, nullptr, FerryTimeStamp(), &r);
    FFJSON& rts = r["things"];
    FFJSON& uts = user["things"];
    int k=rts.size;
@@ -447,7 +449,7 @@ void tls_ntls_common (
       FFJSON sessionData, cookie, payload, reply;
       string subdomain;
       ccp referer=nullptr;char proto[8]="https"; int protolen;
-      ccp username = nullptr, password = nullptr;
+      ccp username = nullptr, password = nullptr, cpld = nullptr;
       ccp jsonHeader = "content-type: text/json\r\n";
       ccp headers = jsonHeader, path;
       string bid;
@@ -488,7 +490,12 @@ void tls_ntls_common (
       if (!strcmp(path, "/cookie")) {
          //cookie
          ffl_notice(FPL_HTTPSERV, "cookie");
-         payload.init((ccp)sessionData["payload"]);
+         cpld = (ccp)sessionData["payload"];
+         if (!cpld) {
+            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nopld");
+            goto done;
+         }
+         payload.init(cpld);
          if (bid.length())
             if(rbs[bid])
                goto gotbid;
@@ -534,7 +541,6 @@ void tls_ntls_common (
          if (username) {
             rbsid["urts"]=lepoch;
             FFJSON& user = users[(ccp)rbsid["user"]];
-            reply = user;
             addSmtgsToReply(users, user, reply, mdts); 
          }
          mg_http_reply(c, 200, headers, "%s",
@@ -542,11 +548,12 @@ void tls_ntls_common (
          rbs.save();
       } else if (!strcmp(path, "/login")) {
          ffl_notice(FPL_HTTPSERV, "Login");
-         if (!bid.length() || !rbs[bid]) {
-            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
+         cpld = (ccp)sessionData["payload"];
+         if (!bid.length() || !rbs[bid] || !cpld) {
+            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobidpld");
             goto done;
          }
-         payload.init((ccp)sessionData["payload"]);
+         payload.init(cpld);
          username=payload["username"];password=payload["password"];
          ffl_notice(FPL_HTTPSERV, "\nUser: %s\nPass: %s", username, password);
          if (!users[username]) {
@@ -563,8 +570,6 @@ void tls_ntls_common (
             rbsid["ip"]=c->rem.ip;
             user["bid"]=bid;
             rbsid["urts"]=lepoch;
-            FFJSON q("{things:!}");
-            user.answerObject(&q, nullptr, FerryTimeStamp(), &reply);
             addSmtgsToReply(users, user, reply, bidThings[&rbsid]);
             mg_http_reply(c, 200, headers, "%s",
                           reply.stringify(true).c_str());
@@ -601,11 +606,12 @@ void tls_ntls_common (
          //signup
          bool recovery=false;
          ffl_notice(FPL_HTTPSERV, "Signup");
-         if (!bid.length() || !rbs[bid]) {
-            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
+         cpld = (ccp)sessionData["payload"];
+         if (!bid.length() || !rbs[bid] || !cpld) {
+            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobidpld");
             goto done;
          }
-         payload.init((ccp)sessionData["payload"]);
+         payload.init(cpld);
          if (payload["email"].isType(FFJSON::STRING)) {
             payload["email"]=tolower(string((ccp)payload["email"]));
          }
@@ -734,11 +740,12 @@ void tls_ntls_common (
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "wrongKey" );
          }
       } else if (strstr(path, "/search")) {
-         if (!bid.length() || !rbs[bid]) {
-            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
+         cpld = (ccp)sessionData["payload"];
+         if (!bid.length() || !rbs[bid] || !cpld) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobidpld");
             goto done;
          }
-         payload.init((ccp)sessionData["payload"]);
+         payload.init(cpld);
          if (payload["search"].isType(FFJSON::UNDEFINED)) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nosearch");
             goto done;
@@ -747,7 +754,6 @@ void tls_ntls_common (
          Pts pts;
          vector<string> mstr = metaname(srchStr);
          pts.ina = nametouint(mstr);
-         FFJSON reply;
          int k=0;
          if (!payload["geoposition"].isType(FFJSON::UNDEFINED) &&
              payload["geoposition"].size==2
@@ -775,23 +781,21 @@ void tls_ntls_common (
          multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch>::iterator it=
             score.begin();
          while (it!=score.end()) {
-            reply["things"][k]=*(get<0>(*it));
+            FFJSON* f = get<0>(*it);
+            reply["things"][k]=f;
             ++k;++it;
          }
          reply["things"][0];
          mg_http_reply(c, 200, headers, "%s",
                        reply.stringify(true).c_str());
       } else if (strstr(path, "/update")) {
-         if (!bid.length() || !rbs[bid]) {
-            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobid");
+         cpld = (ccp)sessionData["payload"];
+         if (!bid.length() || !rbs[bid] || cpld) {
+            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobidpld");
             goto done;
          }
          username=rbs[bid]["user"];
-         if (!sessionData["payload"]) {
-            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "No Content!");
-            goto done;
-         }
-         payload.init((ccp)sessionData["payload"]);
+         payload.init(cpld);
          FFJSON& user = users[username];
          if (payload["things"]) {
             FFJSON& cthings = payload["things"];
@@ -909,17 +913,14 @@ void tls_ntls_common (
          mg_http_reply(c, 200, headers, "%s", user.stringify(true).c_str());
          vhost.save();
       } else if (strstr(path, "/owl")) {
-         if (!bid.length() || !rbs[bid] || !rbs[bid]["user"]) {
+         cpld = (ccp)sessionData["payload"];
+         if (!cpld || !bid.length() || !rbs[bid] || !rbs[bid]["user"]) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
-                          "nobidOrNotSignedIn");
+                          "nobidOrNotSignedInNoPld");
             goto done;
          }
          username=rbs[bid]["user"];
-         if (!sessionData["payload"]) {
-            mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "No Content!");
-            goto done;
-         }
-         payload.init((ccp)sessionData["payload"]);
+         payload.init(cpld);
          FFJSON& user = users[username];
          FFJSON& things = user["things"];
          FFJSON& smsgs = user["smsgs"];
