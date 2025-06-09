@@ -790,7 +790,7 @@ void tls_ntls_common (
                        reply.stringify(true).c_str());
       } else if (strstr(path, "/update")) {
          cpld = (ccp)sessionData["payload"];
-         if (!bid.length() || !rbs[bid] || cpld) {
+         if (!bid.length() || !rbs[bid] || !cpld) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "nobidpld");
             goto done;
          }
@@ -828,8 +828,8 @@ void tls_ntls_common (
                vector<string> mstr;
                vector<uint> ina;
                if (j<0) {
-                  j=0;
-                  uthings[j]["id"] = 1;
+                  j=uthings.size;
+                  uthings[j]["id"] = j?(int)uthings[j-1]["id"]+1:1;
                   FFJSON& ln = uthings[j]["user"].addLink(users, username);
                   if (!ln)
                      delete &ln;
