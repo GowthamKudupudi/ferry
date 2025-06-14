@@ -58,9 +58,9 @@ enum {EHLO, STARTTLS, STARTTLS_WAIT, AUTH, FROM, TO, DATA, BODY, QUIT, END};
 
 struct mg_mgr mgr, mail_mgr;
 
-const char* mail_server = "tcp://192.168.0.150:25";
-const char* admin = "Necktwi";
-const char* admin_pass = "tornshoes";
+const char* mail_server;
+const char* admin;
+const char* admin_pass;
 const char* to = nullptr;
 const char* from = "FerryFair";
 const char* plaintxtHdr = "content-type: text/plain\r\n";
@@ -145,6 +145,16 @@ tuple<void*,int8_t> getNode (NdNPrn n) {
    return bpxor(n.qh->qp, n.prn);
 }
 
+bool isValidText (const char* s, int length) {
+   for (uint i=0; i<length; ++i) {
+      char c = s[i];
+      if (!((c>=' ' && c<='~') || c=='\n')) {
+         return false;
+      }
+   }
+   return true;
+}
+
 static void parseHTTPHeader (const char* uri, size_t len,
                              FFJSON& sessionData) {
    unsigned int i=0;
@@ -153,7 +163,9 @@ static void parseHTTPHeader (const char* uri, size_t len,
       if(uri[i]=='\n') {
          if(uri[i-1]=='\n' || (uri[i-1]=='\r' && uri[i-2]=='\n')) {
             if ((bool)sessionData["content-type"] &&
-               strstr((ccp)sessionData["content-type"],"text")) {
+                strstr((ccp)sessionData["content-type"],"text") &&
+                isValidText(uri+i+1, len-i-1)
+            ) {
                sessionData["payload"]=string(uri+i+1, len-i-1);
             }
             if (len-i-1>0) {
@@ -525,8 +537,7 @@ void tls_ntls_common (
       if (!cpld) {
          goto bidcheck2;
       }
-      payload.init(cpld);
-
+      
       if (!strcmp(path, "/cookie")) {
          //cookie
          ffl_notice(FPL_HTTPSERV, "cookie");
@@ -549,6 +560,7 @@ void tls_ntls_common (
          rbsid["ts"]=now;
          reply["bid"]=bid;
          Pts pts;
+         payload.init(cpld);
          if (!payload["geoposition"].isType(FFJSON::UNDEFINED) &&
              payload["geoposition"].size==2
          ) {
@@ -605,6 +617,7 @@ void tls_ntls_common (
          goto done;
       } else if (!strcmp(path, "/login")) {
          ffl_notice(FPL_HTTPSERV, "Login");
+         payload.init(cpld);
          username=payload["username"];password=payload["password"];
          ffl_notice(FPL_HTTPSERV, "\nUser: %s\nPass: %s", username, password);
          if (!users[username]) {
@@ -631,6 +644,7 @@ void tls_ntls_common (
          goto done;
       } else if (!strcmp(path, "/signup")) {
          //signup
+         payload.init(cpld);
          bool recovery=false;
          ffl_notice(FPL_HTTPSERV, "Signup");
          if (payload["email"].isType(FFJSON::STRING)) {
@@ -731,6 +745,9 @@ void tls_ntls_common (
          sprintf(mesg, "Open %s://%s/activate?user=%s&key=%s to activate "
                  "%s", proto, (ccp)sessionData["host"], username,
                  (ccp)user["activationKey"], username);
+         mail_server = vhost["config"]["secret"]["mail_server"];
+         admin = vhost["config"]["secret"]["admin"];
+         admin_pass = vhost["config"]["secret"]["admin_pass"];
          mg_connect(&mail_mgr, mail_server, mailfn, NULL);
          while(!s_quit)
             mg_mgr_poll(&mail_mgr, 100);
@@ -741,6 +758,7 @@ void tls_ntls_common (
          users.save();
          goto done;
       } else if (strstr(path, "/search")) {
+         payload.init(cpld);
          ccp srchStr = payload["search"];
          Pts pts;
          vector<string> mstr = metaname(srchStr);
@@ -794,9 +812,9 @@ void tls_ntls_common (
 
       if (strstr(path, "/upload?")) {
          int maxThings = (bool)user["maxThings"]?
-            user["maxThings"]:vhost["config"]["defaultMaxThings"];
-         int maxThingPics = (bool)user["maxThings"]?
-            user["maxThings"]:vhost["config"]["defaultMaxThingPics"];
+            user["maxThings"]:vhost["config"]["maxThings"];
+         int maxThingPics = (bool)user["maxThingsPics"]?
+            user["maxThingsPics"]:vhost["config"]["maxThingPics"];
          FFJSON data;
          get_data_in_url(path, data);
          int thingId = atoi((ccp)data["thingId"]);
@@ -905,6 +923,7 @@ void tls_ntls_common (
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "bidmismatch");
             goto done;
          }
+         payload.init(cpld);
          if (payload["things"]) {
             FFJSON& cthings = payload["things"];
             FFJSON& uthings = user["things"];
@@ -1026,6 +1045,7 @@ void tls_ntls_common (
          FFJSON& smsgs = user["smsgs"];
          FFJSON& reps = user["reps"];
          int smind=smsgs.size;
+         payload.init(cpld);
          FFJSON& fQs = payload["Qs"];
          FFJSON::Iterator it;
          long urts;
@@ -1235,7 +1255,8 @@ void tls_ntls_common (
         owldone:
          payload["status"]=1;
          rbsid["urts"]=lepoch;
-         mg_http_reply(c, 200, headers, "%s", payload.stringify(true).c_str());
+         mg_http_reply(c, 200, headers, "%s",
+                       payload.stringify(true).c_str());
          users.save();
          rbs.save();
       }
@@ -1384,7 +1405,7 @@ void QuadNode::updateIntNames (QuadNode* tQN, uint8_t tind,
    for (int8_t i=0;i<4;++i,++qh) {
       vector<uint> lr = qh->getIntNames(tQN, tind, pQN, ind);
       for (int8_t j=0;j<lr.size();++j) {
-         if (j==lr.size()) {
+         if (j==r.size()) {
             r.push_back(0);
          }
          uint& ui = r[j];
@@ -1455,7 +1476,7 @@ uint QuadHldr::insert (FFJSON& rF, vector<uint>& ina, bool deleteLeaf,
       FFJSON& tmp = *tfp;
       qp = new QuadNode();
       if (!sn) {
-         vector<string> mstr = metaname((ccp)(*(FFJSON*)resfp)["name"]);
+         vector<string> mstr = metaname((ccp)tmp["name"]);
          vector<uint> nina = nametouint(mstr);
          for (int i=0; i<nina.size();++i) {
             if (ina.size()<=i) {
