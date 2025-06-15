@@ -1332,7 +1332,8 @@ QuadNode* QuadHldr::qn () {
    QuadNode* r=nullptr;
    for (int i=0; i<qpmapvec.size(); ++i) {
       r = qpmapvec[i].upper_bound((QuadNode*)(this-4))->first;
-      if (this-(QuadHldr*)r <4) {
+      uint dist = (uint)(this-(QuadHldr*)r);
+      if (dist <4) {
          return r;
       }
    }
@@ -1426,7 +1427,7 @@ uint QuadHldr::insert (FFJSON& rF, vector<uint>& ina, bool deleteLeaf,
                        uint level, float x, float y, QuadNode* tQN, int8_t tind,
                        QuadNode* pQN, int8_t ind, int8_t sn) {
    //printf("x,y: %lf,%lf\n", x, y);
-   if (fp==nullptr || (void*)fp==pQN) {
+   if (fp==nullptr) {
       fp = (FFJSON*)fpxor(&rF, pQN, ind);
       //printf("rF:%p,%s inserted\n", &rF,rF["location"].stringify().c_str());
       return level;
@@ -2144,13 +2145,14 @@ WSServer::WSServer (
    makeThngsTree();
    Pts pts;
    vector<string> mstr = metaname("bose");
-   pts.ina=nametouint(mstr);
+   //pts.ina=nametouint(mstr);
    //Circle c = {180.0, 90.0, 10.5};
    //Circle c = {0.1, 0.1, 10.5};
    //Circle c = {0.9, 0.8, 10.5};
    //pts.c = {77.7584640, 12.9826816, 10.5};
    //pts.c = {77.7645299,12.9941367, 10.5};
-   pts.c = {77.7644272,12.9940713, 10.5};
+   //pts.c = {77.7644272, 12.9940713, 10.5};
+   pts.c = {77.7644577, 12.9941273, 10.5};
    printf("c: %f,%f\n", pts.c.x, pts.c.y);
    FerryTimeStamp ftsStart;
    FerryTimeStamp ftsEnd;
