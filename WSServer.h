@@ -191,8 +191,9 @@ struct QuadNode {
    void del (QuadNode* tQN = nullptr, int8_t tind = 0,
              QuadNode* pQN = nullptr, int8_t ind = 0);
    void seti (vector<uint>& ina);
+   bool copyi (vector<uint>& ina);
    uint hasName (vector<uint>& ina, vector<map<QuadNode*,uint>::iterator> vit);
-   void updateIntNames (QuadNode* tQN = nullptr, uint8_t tind = 0,
+   bool updateIntNames (QuadNode* tQN = nullptr, uint8_t tind = 0,
                         QuadNode* pQN = nullptr, uint8_t ind = 0);
    ~QuadNode ();
 };

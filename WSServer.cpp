@@ -584,9 +584,9 @@ void tls_ntls_common (
             mdts.insert(f);
          }
          username = rbsid["user"];
-         if (username) {
+         if (username && (user = &users[username]) &&
+             !strcmp((ccp)user["bid"],bid.c_str())) {
             rbsid["urts"]=lepoch;
-            user = &users[(ccp)rbsid["user"]];
             addSmtgsToReply(users, user, reply, mdts); 
          }
          mg_http_reply(c, 200, headers, "%s",
@@ -804,8 +804,8 @@ void tls_ntls_common (
       if (!rbsid["user"]) {
          goto allfileserver;
       }
-      username=rbsid["user"];
-      user=&users[username];
+      username = rbsid["user"];
+      user = &users[username];
       if (strcmp((ccp)user["bid"],bid.c_str())) {
          goto logout;
       }
@@ -1310,6 +1310,30 @@ void QuadNode::seti (vector<uint>& ina) {
       }
    }
 }
+bool QuadNode::copyi (vector<uint>& ina) {
+   bool changed = false;
+   for (int i=0; i<ina.size();++i) {
+      map<QuadNode*, uint>::iterator it = qpmapvec[i].find(this);
+      if (it != qpmapvec[i].end()) {
+         if (ina[i]) {
+            uint& lni = it->second;
+            if (lni!=ina[i]) {
+               lni = ina[i];
+               changed=true;
+            }            
+         } else {
+            qpmapvec[i].erase(this);
+         }
+      } else {
+         if (ina[i]) {
+            uint& lni = qpmapvec[i][this];
+            lni = ina[i];
+            changed=true;
+         }         
+      }
+   }
+   return changed;
+}
 vector<map<QuadNode*,uint>::iterator> qpfind (QuadNode* qp) {
    vector<map<QuadNode*, uint>::iterator> vit;
    map<QuadNode*, uint>::iterator it;
@@ -1393,18 +1417,22 @@ vector<uint> QuadHldr::getIntNames (QuadNode* tQN, uint8_t tind,
       }
    }
    if (!a) {
-      vector<string> mstr = metaname((ccp)(*(FFJSON*)resfp)["name"]);
+      set<FFJSON*>* ressfp = (set<FFJSON*>*)resfp;
+      set<void*>::iterator sit = setffset.find(ressfp);
+      bool isS=sit != setffset.end();
+      FFJSON& tfp = isS ? **ressfp->begin() : *(FFJSON*)resfp;
+      vector<string> mstr = metaname((ccp)tfp["name"]);
       r=nametouint(mstr);
    }
    return r;
 }
 
-void QuadNode::updateIntNames (QuadNode* tQN, uint8_t tind,
+bool QuadNode::updateIntNames (QuadNode* tQN, uint8_t tind,
                                QuadNode* pQN, uint8_t ind) {
    QuadHldr* qh = (QuadHldr*)this;
    vector<uint> r;
    for (int8_t i=0;i<4;++i,++qh) {
-      vector<uint> lr = qh->getIntNames(tQN, tind, pQN, ind);
+      vector<uint> lr = qh->getIntNames(this, i, tQN, tind);
       for (int8_t j=0;j<lr.size();++j) {
          if (j==r.size()) {
             r.push_back(0);
@@ -1413,7 +1441,7 @@ void QuadNode::updateIntNames (QuadNode* tQN, uint8_t tind,
          ui|=lr[j];
       }
    }
-   seti(r);
+   return copyi(r);
 }
 
 QuadNode::~QuadNode () {
@@ -1459,14 +1487,14 @@ uint QuadHldr::insert (FFJSON& rF, vector<uint>& ina, bool deleteLeaf,
       }
       if (resfp == (void*)&rF)
          return level;
-      FFJSON* tfp = isS ? *ressfp->begin() : (FFJSON*)resfp;
+      FFJSON& tmp = isS ? **ressfp->begin() : *(FFJSON*)resfp;
       //printf("tfp: %p,%p,%p\n",tfp, fp, pQN);
-      if ((float)(*tfp)["location"][0]==(float)rF["location"][0] &&
-          (float)(*tfp)["location"][1]==(float)rF["location"][1]) {
+      if ((float)tmp["location"][0]==(float)rF["location"][0] &&
+          (float)tmp["location"][1]==(float)rF["location"][1]) {
          if (!isS) {
             sp = new set<FFJSON*>();
             setffset.insert(sp);
-            sp->insert(tfp);
+            sp->insert(&tmp);
             sp->insert(&rF);
             sp=(set<FFJSON*>*)fpxor(sp, pQN, ind);
          } else {
@@ -1474,7 +1502,6 @@ uint QuadHldr::insert (FFJSON& rF, vector<uint>& ina, bool deleteLeaf,
          }
          return level;
       }
-      FFJSON& tmp = *tfp;
       qp = new QuadNode();
       if (!sn) {
          vector<string> mstr = metaname((ccp)tmp["name"]);
@@ -1521,7 +1548,7 @@ uint QuadHldr::insert (FFJSON& rF, vector<uint>& ina, bool deleteLeaf,
       int8_t xs=qind==0?1:-1;
       qind<<=1;
       int8_t ys = ly >= y?1:-1;
-      fflush(stdout);
+      //fflush(stdout);
       qind |= ys>=0?0:1;
       //printf("%f,%f,%f,%f,%d,%d,%d\n",x,y,lx,ly,xs,ys,qind);
       qh+=qind;
@@ -1535,7 +1562,7 @@ uint QuadHldr::insert (FFJSON& rF, vector<uint>& ina, bool deleteLeaf,
          if (returnv) {
             qh = (QuadHldr*)qpres;
             if (returnv>1) {
-               qh = &qpres->en;
+               //qh = &qpres->en;
                qind = 0;
                xs=0;
                for (;qind<4;++qind,++qh) {
@@ -1558,7 +1585,7 @@ uint QuadHldr::insert (FFJSON& rF, vector<uint>& ina, bool deleteLeaf,
                   return 2;
                }
             }
-            qpres->updateIntNames(tQN,tind,pQN,ind);
+            return qpres->updateIntNames(tQN,tind,pQN,ind);
          }
          return 0;
       }
