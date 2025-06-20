@@ -790,8 +790,11 @@ void tls_ntls_common (
          multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch>::iterator it=
             score.begin();
          while (it!=score.end()) {
-            FFJSON* f = get<0>(*it);
-            reply["things"][k]=f;
+            FFJSON& f = *get<0>(*it);
+            FFJSON& rt = reply["things"][k];
+            rt["id"]=f["id"];
+            rt["user"]=&f["user"]["name"];
+            rt["name"]=&f["name"];
             ++k;++it;
          }
          reply["things"][0];
@@ -1393,7 +1396,11 @@ int8_t ffHasName (FFJSON& ff, vector<uint>& ina) {
    vector<string> mstr = metaname((ccp)ff["name"]);
    vector<uint> nina = nametouint(mstr);
    int8_t count=0;
-   for (int i=0;i<ina.size();++i) {
+   int smallest=ina.size();
+   if(smallest>nina.size()) {
+      smallest=nina.size();
+   }
+   for (int i=0;i<smallest;++i) {
       count += countSetBits(ina[i] & nina[i]);
    }
    return count;
@@ -1682,7 +1689,7 @@ int QuadHldr::addThis (Pts& pts, Direction d, float dx, float ds,
             return -1;
          }
          NdNPrn nd2;
-         if (pts.pts[i-1].qh == this) {
+         if (i>0 && pts.pts[i-1].qh == this) {
             nd2 = pts.pts[i-1];
          }
          pts.pts.erase(
@@ -1714,6 +1721,7 @@ int QuadHldr::addThis (Pts& pts, Direction d, float dx, float ds,
       }
    }
    if (!there) {
+     nothere:
       pts.pts.push_back(n);
    }
    return 1;
@@ -1908,10 +1916,10 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
          }
       }
       //printpts(pts.pts);
-      ++pts.ni;
       pts.nni = pts.pts.size()-1;
       if (pts.nni<0)
          return 0;
+      ++pts.ni;
       quickSort(pts.pts,pts.ni,pts.nni);
       //printf("---------\n");
       //printpts(pts.pts);
@@ -2171,8 +2179,9 @@ WSServer::WSServer (
    
    makeThngsTree();
    Pts pts;
-   vector<string> mstr = metaname("bose");
-   //pts.ina=nametouint(mstr);
+   //vector<string> mstr = metaname("bose");
+   vector<string> mstr = metaname("Indulehka Bringha Hair Oil");
+   pts.ina=nametouint(mstr);
    //Circle c = {180.0, 90.0, 10.5};
    //Circle c = {0.1, 0.1, 10.5};
    //Circle c = {0.9, 0.8, 10.5};
