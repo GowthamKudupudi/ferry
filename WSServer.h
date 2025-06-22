@@ -134,8 +134,9 @@ union QuadHldr {
    set<FFJSON*>* sp;
    QuadNode* qn ();
    uint insert (
-      FFJSON& rF, vector<uint>& ina, bool deleteLeaf = false, uint level = 0,
-      float x = 0.0, float y = 0.0, QuadNode* tQN = nullptr, int8_t tind=0,
+      FFJSON& rF, vector<uint>& ina, bool deleteLeaf = false,
+      float lx= 0.0, float ly=0.0, float x = 0.0, float y = 0.0,
+      uint level = 0, QuadNode* tQN = nullptr, int8_t tind=0,
       QuadNode* pQN = nullptr, int8_t ind=0, int8_t sn = 0
    );
    uint getPointsFromQuad (
@@ -188,11 +189,17 @@ struct QuadNode {
    QuadHldr wn;
    QuadHldr ws;
    QuadNode ();
+   uint insert (
+      FFJSON& rF, vector<uint>& ina, float lx, float ly, float x = 0.0,
+      float y = 0.0, uint level = 0, QuadNode* pQN = nullptr, int8_t ind=0,
+      bool deleteLeaf = false, int8_t sn = 0
+   );
    void del (QuadNode* tQN = nullptr, int8_t tind = 0,
              QuadNode* pQN = nullptr, int8_t ind = 0);
    void seti (vector<uint>& ina);
    bool copyi (vector<uint>& ina);
-   uint hasName (vector<uint>& ina, vector<map<QuadNode*,uint>::iterator> vit);
+   uint hasName (vector<uint>& ina,
+                 vector<map<QuadNode*,uint>::iterator> vit);
    bool updateIntNames (QuadNode* tQN = nullptr, uint8_t tind = 0,
                         QuadNode* pQN = nullptr, uint8_t ind = 0);
    ~QuadNode ();
