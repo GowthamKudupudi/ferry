@@ -728,17 +728,14 @@ void tls_ntls_common (
                           "Username already taken, choose an another :|");
             goto done;
          } else if (
-            !recovery && user["password"] &&
-            users[(ccp)payload["email"]].val.fptr!=&users[username]
+            !recovery && users[(ccp)payload["email"]] && !user["email"]
          ) {
             ffl_warn(FPL_HTTPSERV, "Email already registered.");
             mg_http_reply(c, 200, headers, "{%Q:%d,%Q:%Q}", "actEmailSent",
                           -3, "msg",
                           "Email already registered! Try resetting password");
             goto done;
-         } else if (!recovery &&
-                    !(validUsername(string(username)) && strlen(username)<=32)
-         ) {
+         } else if (!recovery && !(validUsername(string(username)))) {
             ffl_warn(FPL_HTTPSERV, "Invalid password");
             mg_http_reply(c, 200, headers, "{%Q:%d,%Q:%Q}", "actEmailSent",
                           -6, "msg", "Invalid password X|");
@@ -833,7 +830,6 @@ void tls_ntls_common (
             FFJSON& rt = reply["things"][k];
             rt["id"]=f["id"];
             rt["user"]=&f["user"]["name"];
-            rt["name"]=&f["name"];
             ++k;++it;
          }
          reply["things"][0];
