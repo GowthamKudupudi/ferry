@@ -636,7 +636,7 @@ void tls_ntls_common (
       }
       rbsid = &rbs[bid];
       if (!cpld) {
-         if (strstr(path, "/upload?offset")) {
+         if (strstr(path, "/upload?thingId=")) {
             goto upload;
          }
          goto allfileserver;
@@ -861,42 +861,44 @@ void tls_ntls_common (
          int chnkSz= atoi((ccp)data["chunkSize"]);
          int ttlSz = atoi((ccp)data["totalSize"]);
          int thngi = -1;
-         if (fofst!=0) {
-            FFJSON& ptgs=user["pendingThings"];
-            if(thingId!=(int)ptgs["thingId"]){
-               mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
-                             "noSuchThingId" );
-               goto done;                  
-            };
-            picId=ptgs["picId"];
-            thngi=ptgs["thngi"];
-            goto gotThingId;
-         }
+         // if (fofst!=0) {
+         //    FFJSON& ptgs=user["pendingThings"];
+         //    if(thingId!=(int)ptgs["thingId"]){
+         //       mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
+         //                     "noSuchThingId" );
+         //       goto done;                  
+         //    };
+         //    picId=ptgs["picId"];
+         //    thngi=ptgs["thngi"];
+         //    goto gotThingId;
+         // }
+         FFJSON& uthings = user["things"];
          if (thingId < 0) {
-            if ((bool)user["things"] && user["things"].size>=maxThings) {
+            if (uthings && uthings.size>=maxThings) {
                ffl_notice (
                   FPL_HTTPSERV,
-                  "user[\"things\"].size: %d", user["things"].size
+                  "user[\"things\"].size: %d", uthings.size
                );
                mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
                              "thingsAreAtMax" );
                goto done;
             }
-            if ((bool)user["things"] && user["things"].size) {
-               thngi=user["things"].size;
-               thingId=(int)user["things"][thngi-1]["id"]+1;
+            if (uthings && uthings.size) {
+               thngi=uthings.size;
+               thingId=(int)uthings[thngi-1]["id"]+1;
             } else {
                thngi=0;
                thingId=1;
             }
          } else {
-            int tSize = user["things"].size-1;
-            for (int i=(thingId<tSize?thingId:tSize); i>=0; --i) {
-               if ((int)user["things"][i]["id"]==thingId) {
-                  thngi=i;
-                  break;
-               }
-            }
+            thngi=getIdChildInd(uthings, thingId);
+            // int tSize = user["things"].size-1;
+            // for (int i=(thingId<tSize?thingId:tSize); i>=0; --i) {
+            //    if ((int)user["things"][i]["id"]==thingId) {
+            //       thngi=i;
+            //       break;
+            //    }
+            // }
             if (thngi<0) {
                mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
                              "noSuchThingId" );
@@ -925,29 +927,28 @@ void tls_ntls_common (
          upldpth +=".jpg";
          ffl_notice(FPL_HTTPSERV, "receiving: %s", upldpth.c_str());
          if (fofst==0) {
-            FFJSON& uts = user["things"];
-            uts[thngi]["id"]=thingId;
-            if (!uts[thngi]["user"]) {
-               uts[thngi]["user"].addLink(users, username);
+            uthings[thngi]["id"]=thingId;
+            if (!uthings[thngi]["user"]) {
+               uthings[thngi]["user"].addLink(users, username);
             }
-            FFJSON& ups = uts[thngi]["pics"];
+            FFJSON& ups = uthings[thngi]["pics"];
             ups[picId]["partial"] = true;
-            if (fofst+chnkSz<ttlSz) {
-               FFJSON& ptgs=user["pendingThings"];
-               ptgs["thingId"]=thingId;
-               ptgs["picId"]=picId;
-               ptgs["thngi"]=thngi;
-            }
+            // if (fofst+chnkSz<ttlSz) {
+            //    FFJSON& ptgs=user["pendingThings"];
+            //    ptgs["thingId"]=thingId;
+            //    ptgs["picId"]=picId;
+            //    ptgs["thngi"]=thngi;
+            // }
          }
          char msg[30];
          sprintf(msg, "{\"thingId\":%d,\"picId\":%d", thingId, picId);
          mg_http_upload(
             c, hm, &mg_fs_posix, upldpth.c_str(), 2999999, msg);
          if (fofst+chnkSz >= ttlSz) {
-            user.erase("pendingThings");
-            user["things"][thngi]["pics"][picId].erase("partial");
-            user["things"][thngi]["pics"][picId]["ts"]=lepoch;
-            printf("pendingThings\n");
+//            user.erase("pendingThings");
+            uthings[thngi]["pics"][picId].erase("partial");
+            uthings[thngi]["pics"][picId]["ts"]=lepoch;
+//            printf("pendingThings\n");
             users.save();
          }
       } else if (!strcmp(path, "/logout")) {
