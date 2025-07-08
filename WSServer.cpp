@@ -636,7 +636,7 @@ void tls_ntls_common (
       }
       rbsid = &rbs[bid];
       if (!cpld) {
-         if (strstr(path, "/upload?thingId=")) {
+         if (strstr(path, "/upload?chunkSize=")) {
             goto upload;
          }
          goto allfileserver;
@@ -1242,6 +1242,7 @@ void tls_ntls_common (
             FFJSON& rep=payload["rnews"][j];
             rep=smsg;
             rep[3]=trmsgs[mind]["rep"];
+            rep[4]=smind;
             --i;++j;
             if (i<0) {
                break;
