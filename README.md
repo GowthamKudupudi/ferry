@@ -1,5 +1,5 @@
-# ferrymediaserver
-- Streams media to any device
+# ferryfair
+- Super fast spatial search
 
 ## build
 - `sudo apt-get install libpam0g-dev`
