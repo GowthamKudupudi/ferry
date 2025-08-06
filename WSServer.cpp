@@ -502,6 +502,7 @@ void tls_ntls_common (
       struct mg_http_message* hm = (struct mg_http_message*) ev_data;
       //ffl_notice(FPL_HTTPSERV, "hm->uri:\n%s", hm->uri.ptr);
       FFJSON sessionData, cookie, payload, reply, user, rbsid;
+      FFJSON urlData;
       string subdomain;
       ccp referer=nullptr;char proto[8]="https"; int protolen;
       ccp username = nullptr, password = nullptr, cpld = nullptr;
@@ -544,14 +545,13 @@ void tls_ntls_common (
       path = sessionData["path"];
 
       if (strstr(path, "/activate?")) {
-         FFJSON data;
-         get_data_in_url(path, data);
-         username=data["user"];
+         get_data_in_url(path, urlData);
+         username=urlData["user"];
          user=&users[username];
          if ((!user["password"] || !user["inactive"]) &&
              !user["newpassword"]) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "wrongKey" );
-         } else if (!strcmp(user["activationKey"],data["key"])) {
+         } else if (!strcmp(user["activationKey"],urlData["key"])) {
             if (user["newpassword"]) {
                user["password"]=user["newpassword"];
                user["newpassword"]=false;
@@ -574,7 +574,7 @@ void tls_ntls_common (
          goto bidcheck2;
       }
       
-      if (!strcmp(path, "/cookie")) {
+      if (strstr(path, "/cookie")==path) {
          //cookie
          ffl_notice(FPL_HTTPSERV, "cookie");
          if (bid.length())
@@ -595,7 +595,18 @@ void tls_ntls_common (
          rbsid = &rbs[bid];
          rbsid["ts"]=now;
          reply["bid"]=bid;
+         get_data_in_url(path, urlData);
+         set<FFJSON*>& mdts = bidThings[&rbsid];
          Pts pts;
+         if (urlData["user"] && urlData["thing"]) {
+            FFJSON& uthings = users[(ccp)urlData["user"]]["things"];
+            int tind = getIdChildInd(uthings, atoi(urlData["thing"]));
+            FFJSON* thn = &uthings[tind];
+            reply["things"][0]=thn;
+            mdts.clear();
+            mdts.insert(thn);
+            goto cookieReply;
+         }
          payload.init(cpld);
          if (!payload["geoposition"].isType(FFJSON::UNDEFINED) &&
              payload["geoposition"].size==2
@@ -605,7 +616,6 @@ void tls_ntls_common (
             rbsid["geoposition"] = payload["geoposition"];
          }
          thnsTree.getPointsFromQuad(pts);
-         set<FFJSON*>& mdts = bidThings[&rbsid];
          mdts.clear();
          for (uint i = 0; i<pts.pts.size(); ++i) {
             NdNPrn& nd = pts.pts[i];
@@ -619,11 +629,17 @@ void tls_ntls_common (
             reply["things"][i]=f;
             mdts.insert(f);
          }
+        cookieReply:
          username = rbsid["user"];
          if (username && (user = &users[username]) &&
              !strcmp((ccp)user["bid"],bid.c_str())) {
             rbsid["urts"]=lepoch;
-            addSmtgsToReply(users, user, reply, mdts); 
+            if (mdts.size()) {
+               addSmtgsToReply(users, user, reply, mdts);
+            } else {
+               FFJSON q("{things:!}");
+               user.answerObject(&q, nullptr, FerryTimeStamp(), &reply);
+            }
          }
          mg_http_reply(c, 200, headers, "%s",
                        reply.stringify(true).c_str());
@@ -825,11 +841,18 @@ void tls_ntls_common (
          }
          multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch>::iterator it=
             score.begin();
+         rbsid = &rbs[bid];
+         set<FFJSON*>& mdts = bidThings[&rbsid];
          while (it!=score.end()) {
             FFJSON& f = *get<0>(*it);
-            FFJSON& rt = reply["things"][k];
-            rt["id"]=f["id"];
-            rt["user"]=&f["user"]["name"];
+            bool thingIsWithUser = mdts.find(&f)!=mdts.end();
+            if (thingIsWithUser) {
+               FFJSON& rt = reply["things"][k];
+               rt["id"]=f["id"];
+               rt["user"]=&f["user"]["name"];
+            } else {
+               reply["things"][k]=&f;
+            }
             ++k;++it;
          }
          reply["things"][0];
@@ -853,13 +876,12 @@ void tls_ntls_common (
             user["maxThings"]:vhost["config"]["maxThings"];
          int maxThingPics = (bool)user["maxThingsPics"]?
             user["maxThingsPics"]:vhost["config"]["maxThingPics"];
-         FFJSON data;
-         get_data_in_url(path, data);
-         int thingId = atoi((ccp)data["thingId"]);
-         int picId = atoi((ccp)data["picId"]);
-         int fofst = atoi((ccp)data["offset"]);
-         int chnkSz= atoi((ccp)data["chunkSize"]);
-         int ttlSz = atoi((ccp)data["totalSize"]);
+         get_data_in_url(path, urlData);
+         int thingId = atoi((ccp)urlData["thingId"]);
+         int picId = atoi((ccp)urlData["picId"]);
+         int fofst = atoi((ccp)urlData["offset"]);
+         int chnkSz= atoi((ccp)urlData["chunkSize"]);
+         int ttlSz = atoi((ccp)urlData["totalSize"]);
          int thngi = -1;
          // if (fofst!=0) {
          //    FFJSON& ptgs=user["pendingThings"];

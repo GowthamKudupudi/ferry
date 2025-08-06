@@ -1968,7 +1968,10 @@ static void listdir(struct mg_connection *c, struct mg_http_message *hm,
             opts->extra_headers == NULL ? "" : opts->extra_headers);
   off = c->send.len;  // Start of body
   mg_printf(c,
-            "<!DOCTYPE html><html><head><title>Index of %.*s</title>%s%s"
+            "<!DOCTYPE html><html><head><title>Index of %.*s</title>"
+            "<meta name=\"viewport\" "
+            "content=\"width=device-width,initial-scale=1\"/>"
+            "%s%s"
             "<style>th,td {text-align: left; padding-right: 1em; "
             "font-family: monospace; }</style></head>"
             "<body><h1>Index of %.*s</h1><table cellpadding=\"0\"><thead>"
