@@ -528,6 +528,13 @@ void tls_ntls_common (
       auto now_ms =
          chrono::time_point_cast<chrono::milliseconds>(now);
       long lepoch = now_ms.time_since_epoch().count();
+      if (vhost["redirect"]) {
+         char rhed[64];
+         sprintf(rhed, "Location: %s\r\n", (ccp)vhost["redirect"]);
+         mg_http_reply(c, 301, rhed, "permenantly moved to %s",
+                       (ccp)vhost["redirect"]);
+         goto done;
+      }
       if (!sessionData["referer"]) goto nextproto;
       referer=sessionData["referer"];
       username = strstr(referer,":");
@@ -605,6 +612,8 @@ void tls_ntls_common (
             reply["things"][0]=thn;
             mdts.clear();
             mdts.insert(thn);
+            FFJSON q("{things:!}");
+            user.answerObject(&q, nullptr, FerryTimeStamp(), &reply);
             goto cookieReply;
          }
          payload.init(cpld);
@@ -629,18 +638,13 @@ void tls_ntls_common (
             reply["things"][i]=f;
             mdts.insert(f);
          }
-        cookieReply:
          username = rbsid["user"];
          if (username && (user = &users[username]) &&
              !strcmp((ccp)user["bid"],bid.c_str())) {
             rbsid["urts"]=lepoch;
-            if (mdts.size()) {
-               addSmtgsToReply(users, user, reply, mdts);
-            } else {
-               FFJSON q("{things:!}");
-               user.answerObject(&q, nullptr, FerryTimeStamp(), &reply);
-            }
+            addSmtgsToReply(users, user, reply, mdts);
          }
+        cookieReply:
          mg_http_reply(c, 200, headers, "%s",
                        reply.stringify(true).c_str());
          rbs.save();
